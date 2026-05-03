@@ -1207,12 +1207,12 @@ async function fetchAllData() {
 
   for (const mktId of CFG.mkts) {
     try {
-      // 1. Önce bekleyenleri (Pending) çekiyoruz
+      // 1. Bekleyen siparişleri çek
       const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
       if (!raw) continue;
       const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
 
-      // 2. 🛠️ YENİ: Asıl DB'yi (Tamamlananların olduğu hücreyi) çekiyoruz
+      // 2. Asıl DB'yi (Tamamlananları) çek
       let dbData = {};
       try {
         const rawDb = await sbGet(`DB_${mktId}`);
@@ -1221,8 +1221,18 @@ async function fetchAllData() {
         }
       } catch(e) { console.warn(`DB_${mktId} çekilemedi.`); }
 
-      // 3. Siparişleri ekrana basmaya başlıyoruz
+      let pendingUpdated = false; // Supabase'den silinen kayıt olup olmadığını takip edeceğiz
+
+      // 3. Siparişleri tara
       for (const [sid, order] of Object.entries(pending)) {
+        
+        // 🚀 DİKKAT: SİPARİŞ DB'DE VARSA PENDING'DEN KALICI OLARAK SİL!
+        if (dbData[sid] && dbData[sid].buyerOrderId) {
+            delete pending[sid]; // JSON'dan uçur
+            pendingUpdated = true; // Supabase'i güncellememiz gerektiğini işaretle
+            continue; // Ekrana çizme, bu iş zaten bitmiş!
+        }
+
         let prices = order.prices || null;
         if (!prices) {
           try {
@@ -1231,21 +1241,21 @@ async function fetchAllData() {
           } catch(e) {}
         }
         
-        // 🛠️ AKILLI KONTROL: Eğer asıl DB'de bu sipariş varsa ve buyerOrderId girilmişse, panel bunu anlasın
-        let finalBid = order.bid || order.buyerOrderId; // Önce PENDING içinde arar
-        if (!finalBid && dbData[sid] && dbData[sid].buyerOrderId) {
-            finalBid = dbData[sid].buyerOrderId; // Eğer PENDING'te yoksa, gider DB_78524 içinden bulur!
-        }
-
         _allOrders.push({ 
           ...order, 
           sid, 
           mktId, 
           storeName: storeNames[mktId] || mktId, 
-          prices,
-          bid: finalBid // Bulduğumuz Amazon ID'sini buraya yapıştırıyoruz
+          prices 
         });
       }
+
+      // 🧹 EĞER TEMİZLİK YAPILDIYSA SUPABASE'İ GÜNCELLE VE HÜCREYİ TEMİZLE
+      if (pendingUpdated) {
+         await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
+         console.log(`[Temizlik] ${mktId} için tamamlanan siparişler Supabase PENDING hücresinden silindi!`);
+      }
+
     } catch(e) { console.error(`mktId ${mktId} fetch error:`, e); }
   }
 
