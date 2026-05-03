@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SF Admin">
+<meta name="theme-color" content="#0f172a">
+<title>SellerFlash · Admin Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Inter and Fira Code for a highly professional dashboard look -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0f172a; /* Slate 900 */
+    --bg2:      #1e293b; /* Slate 800 */
+    --bg3:      #334155; /* Slate 700 */
+    --border:   #334155;
+    --accent:   #3b82f6; /* Blue 500 (More professional primary) */
+    --accent2:  #60a5fa; /* Blue 400 */
+    --green:    #10b981; /* Emerald 500 */
+    --yellow:   #f59e0b; /* Amber 500 */
+    --orange:   #f97316; /* Orange 500 */
+    --red:      #ef4444; /* Red 500 */
+    --purple:   #8b5cf6; /* Violet 500 */
+    --text:     #f8fafc; /* Slate 50 */
+    --text2:    #cbd5e1; /* Slate 300 */
+    --text3:    #94a3b8; /* Slate 400 */
+    --mono:     'Fira Code', monospace;
+    --sans:     'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── CONFIG OVERLAY ── */
+  #config-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+  }
+  #config-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    width: 420px;
+    max-width: 90vw;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  }
+  #config-box h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #config-box h2::before {
+    content: '⚙️';
+  }
+  .cfg-label {
+    font-size: 11px;
+    color: var(--text3);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    margin-top: 16px;
+  }
+  .cfg-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: all .2s;
+  }
+  .cfg-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+  .cfg-note {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+  #cfg-save {
+    margin-top: 28px;
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 14px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  #cfg-save:hover { background: var(--accent2); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
+
+  /* ── TOPBAR ── */
+  #topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(30, 41, 59, 0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .logo {
+    font-weight: 800;
+    font-size: 18px;
+    color: var(--text);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .logo span { color: var(--accent); font-weight: 600; }
+  #topbar-stats {
+    display: flex;
+    gap: 24px;
+    margin-left: auto;
+    flex: 1;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .tstat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text2);
+    background: var(--bg);
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+  .tstat-val { color: var(--text); font-weight: 600; }
+  .tstat-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text3);
+  }
+  .tstat-dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  .tstat-dot.orange { background: var(--orange); box-shadow: 0 0 8px var(--orange); animation: pulse 2s infinite; }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: .5; }
+  }
+  #refresh-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all .2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  #refresh-btn:hover { background: var(--accent2); transform: translateY(-1px); }
+  #refresh-btn svg { transition: transform .5s; }
+  #refresh-btn.spinning svg { transform: rotate(360deg); }
+  #settings-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text2);
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all .2s;
+  }
+  #settings-btn:hover { border-color: var(--text3); color: var(--text); }
+
+  /* ── MAIN ── */
+  #main {
+    position: relative;
+    z-index: 1;
+    padding: 32px 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* ── AMAZON STATUS BAR ── */
+  #amazon-status {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 13px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+  }
+  #amazon-status.in-progress { border-left: 4px solid var(--orange); }
+  #amazon-status.failed { border-left: 4px solid var(--red); }
+  #amazon-status.completed { border-left: 4px solid var(--green); }
+  #amazon-status.idle { border-left: 4px solid var(--border); }
+  
+  .az-label { font-weight: 700; font-size: 14px; color: var(--text); display: flex; align-items: center; gap: 8px;}
+  .az-label::before { content: '🤖'; }
+  .az-detail { color: var(--text2); flex: 1; font-family: var(--mono); font-size: 12px; }
+  .az-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+  }
+  .az-badge.pending   { background: rgba(59,130,246,.15);  color: var(--accent2); }
+  .az-badge.progress  { background: rgba(249,115,22,.15);  color: var(--orange); }
+  .az-badge.failed    { background: rgba(239,68,68,.15);   color: var(--red); }
+  .az-badge.completed { background: rgba(16,185,129,.15);  color: var(--green); }
+  .az-badge.idle      { background: var(--bg3); color: var(--text2); }
+
+  /* ── STORE GRID ── */
+  #stores-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+  }
+  .store-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    cursor: pointer;
+    transition: all .2s ease;
+    position: relative;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  }
+  .store-card:hover { 
+    border-color: var(--text3); 
+    transform: translateY(-2px); 
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); 
+  }
+  .store-card.active { 
+    border-color: var(--accent); 
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .store-name {
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+  .store-mkt { color: var(--text3); font-size: 12px; font-family: var(--mono); margin-bottom: 20px; }
+  .store-counts {
+    display: flex;
+    gap: 12px;
+  }
+  .sc {
+    flex: 1;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    border: 1px solid var(--border);
+  }
+  .sc-num {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .sc-num.orange { color: var(--orange); }
+  .sc-num.blue   { color: var(--accent2); }
+  .sc-num.green  { color: var(--green); }
+  .sc-num.gray   { color: var(--text2); }
+  .sc-label { color: var(--text3); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* ── ORDER TABLE ── */
+  #orders-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  }
+  #orders-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: rgba(30, 41, 59, 0.4);
+  }
+  #orders-title {
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--text);
+  }
+  .filter-tabs {
+    display: flex;
+    gap: 6px;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 4px;
+    border: 1px solid var(--border);
+  }
+  .ftab {
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    color: var(--text3);
+    border: none;
+    background: none;
+  }
+  .ftab.active { background: var(--bg3); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+  .ftab:hover:not(.active) { color: var(--text2); background: rgba(51, 65, 85, 0.5); }
+
+  /* ── TABLE ── */
+  #orders-table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left;
+    padding: 14px 24px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text3);
+    font-weight: 600;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background .2s;
+    cursor: pointer;
+  }
+  tbody tr:hover { background: rgba(59, 130, 246, 0.05); }
+  tbody tr:last-child { border-bottom: none; }
+  td {
+    padding: 16px 24px;
+    vertical-align: middle;
+  }
+  .sid-cell { font-weight: 600; font-family: var(--mono); color: var(--text); font-size: 13px; }
+  .asin-cell { font-family: var(--mono); color: var(--accent2); font-size: 12px; }
+  .product-cell {
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text2);
+    font-size: 13px;
+  }
+  .date-cell { color: var(--text3); font-size: 12px; white-space: nowrap; }
+
+  /* State badges */
+  .state-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .3px;
+    white-space: nowrap;
+  }
+  .state-badge::before { content: ''; display: block; width: 6px; height: 6px; border-radius: 50%; }
+  
+  .s-new { background: rgba(59,130,246,.1); color: var(--accent2); }
+  .s-new::before { background: var(--accent2); }
+  
+  .s-priced { background: rgba(139,92,246,.1); color: #a78bfa; }
+  .s-priced::before { background: #a78bfa; }
+  
+  .s-ordered { background: rgba(245,158,11,.1); color: #fbbf24; }
+  .s-ordered::before { background: #fbbf24; }
+  
+  .s-amazon { background: rgba(249,115,22,.1); color: #fb923c; }
+  .s-amazon::before { background: #fb923c; }
+  
+  .s-done { background: rgba(16,185,129,.1); color: #34d399; }
+  .s-done::before { background: #34d399; }
+  
+  .s-skipped { background: rgba(148,163,184,.1); color: var(--text3); }
+  .s-skipped::before { background: var(--text3); }
+
+  /* Price cell */
+  .price-cell { font-size: 13px; }
+  .price-best { color: var(--green); font-weight: 600; font-family: var(--mono); }
+  .price-na { color: var(--text3); }
+
+  /* Actions */
+  .action-cell { display: flex; gap: 8px; align-items: center; }
+  .act-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all .2s;
+    font-family: var(--sans);
+    white-space: nowrap;
+  }
+  .btn-price  { border-color: rgba(139,92,246,.3); color: #a78bfa; background: rgba(139,92,246,.1); }
+  .btn-order  { border-color: rgba(245,158,11,.3); color: #fbbf24; background: rgba(245,158,11,.1); }
+  .btn-amazon { border-color: rgba(249,115,22,.3); color: #fb923c; background: rgba(249,115,22,.1); }
+  .btn-cancel { border-color: rgba(239,68,68,.3);  color: #f87171; background: rgba(239,68,68,.1); }
+  .btn-skip   { border-color: var(--border);       color: var(--text2); background: var(--bg); }
+  
+  .btn-price:hover  { background: rgba(139,92,246,.2); border-color: #a78bfa;}
+  .btn-order:hover  { background: rgba(245,158,11,.2); border-color: #fbbf24;}
+  .btn-amazon:hover { background: rgba(249,115,22,.2); border-color: #fb923c;}
+  .btn-cancel:hover { background: rgba(239,68,68,.2); border-color: #f87171;}
+  .btn-skip:hover   { background: var(--border); color: var(--text); }
+
+  /* Wh cell */
+  .wh-cell { font-size: 12px; color: var(--text2); font-weight: 500;}
+  .bid-cell a { font-size: 12px; color: var(--accent2); font-family: var(--mono); text-decoration: none;}
+  .bid-cell a:hover { text-decoration: underline; }
+
+  /* ── DETAIL MODAL ── */
+  #modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.8);
+    z-index: 90;
+    backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+  }
+  #modal-overlay.open { display: flex; }
+  #modal {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 600px;
+    max-width: 95vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 32px;
+    position: relative;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+    animation: slideUp .2s ease-out;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  #modal-close {
+    position: absolute;
+    top: 24px; right: 24px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text2);
+    width: 32px; height: 32px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s;
+  }
+  #modal-close:hover { color: var(--text); background: var(--bg3); }
+  #modal-title {
+    font-weight: 700;
+    font-size: 18px;
+    margin-bottom: 24px;
+    padding-right: 40px;
+    line-height: 1.4;
+    color: var(--text);
+  }
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .detail-item.full { grid-column: 1/-1; }
+  .detail-key {
+    font-size: 11px;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--text3);
+    margin-bottom: 6px;
+  }
+  .detail-val {
+    font-size: 14px;
+    color: var(--text);
+    font-weight: 500;
+    word-break: break-all;
+    background: var(--bg);
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .detail-val a { color: var(--accent2); text-decoration: none; }
+  .detail-val a:hover { text-decoration: underline; }
+  .modal-prices {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .modal-prices-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--text3);
+    margin-bottom: 16px;
+  }
+  .price-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .price-row:last-child { border-bottom: none; padding-bottom: 0;}
+  .price-row-name { color: var(--text2); font-size: 13px; font-weight: 500;}
+  .price-row-val  { font-weight: 600; font-size: 14px; font-family: var(--mono);}
+  .price-row-val.best { color: var(--green); }
+  .modal-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .modal-actions .act-btn { padding: 10px 20px; font-size: 13px; flex: 1; text-align: center; justify-content: center;}
+
+  /* ── LOADING ── */
+  #loading {
+    display: none;
+    text-align: center;
+    padding: 60px;
+    color: var(--text3);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--bg3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── EMPTY ── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--text3);
+  }
+  .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+  .empty-text { font-size: 15px; font-weight: 500; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 24px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 200;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { border-left: 4px solid var(--green); }
+  #toast.error   { border-left: 4px solid var(--red); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+</style>
+</head>
+<body>
+
+<!-- CONFIG -->
+<div id="config-overlay">
+  <div id="config-box">
+    <h2>SellerFlash Admin</h2>
+    <div class="cfg-label">Supabase URL</div>
+    <input class="cfg-input" id="cfg-url" type="text" placeholder="https://xxxx.supabase.co">
+    <div class="cfg-label">Supabase Anon Key</div>
+    <input class="cfg-input" id="cfg-key" type="password" placeholder="eyJ...">
+    <div class="cfg-label">Marketplace ID'ler (Virgülle Ayır)</div>
+    <input class="cfg-input" id="cfg-mkts" type="text" placeholder="78524,87709" value="78524,87709">
+    <div class="cfg-note">Ayarlar tarayıcınızda (Local Storage) güvenle saklanır. Sadece ilk açılışta gereklidir.</div>
+    <button id="cfg-save">Sisteme Bağlan</button>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="logo">SF<span>·Admin</span></div>
+  <div id="topbar-stats">
+    <div class="tstat">
+      <div class="tstat-dot" id="conn-dot"></div>
+      <span id="conn-label">Bağlanıyor</span>
+    </div>
+    <div class="tstat" title="Bekleyen Siparişler">
+      <span>⏱️ Bekleyen:</span>
+      <span class="tstat-val" id="stat-pending">—</span>
+    </div>
+    <div class="tstat" title="Amazon'da İşlenenler">
+      <span>🛒 Amazon:</span>
+      <span class="tstat-val" id="stat-amazon">—</span>
+    </div>
+  </div>
+  <button id="refresh-btn" onclick="refreshAll()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+      <path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+      <path d="M8 16H3v5"/>
+    </svg>
+    Yenile
+  </button>
+  <button id="settings-btn" onclick="openSettings()" title="Ayarlar">⚙️</button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- Amazon Status -->
+  <div id="amazon-status" class="idle">
+    <div class="az-label">Amazon Oto-Sipariş Botu</div>
+    <div class="az-detail" id="az-detail">Sistem Beklemede — Aktif iş bulunmuyor.</div>
+    <div class="az-badge idle" id="az-badge">IDLE</div>
+  </div>
+
+  <!-- Store Cards -->
+  <div id="stores-grid"></div>
+
+  <!-- Orders Panel -->
+  <div id="orders-panel">
+    <div id="orders-header">
+      <div id="orders-title">Sipariş Yönetimi</div>
+      <div class="filter-tabs">
+        <button class="ftab active" onclick="setFilter('all')">Tümü</button>
+        <button class="ftab" onclick="setFilter('new')">Yeni</button>
+        <button class="ftab" onclick="setFilter('priced')">Fiyat Alınan</button>
+        <button class="ftab" onclick="setFilter('ordered')">Depo Seçilen</button>
+        <button class="ftab" onclick="setFilter('amazon')">Amazon'da</button>
+        <button class="ftab" onclick="setFilter('done')">Tamamlanan</button>
+        <button class="ftab" onclick="setFilter('skipped')">Atlanan</button>
+      </div>
+    </div>
+    <div id="loading"><div class="spinner"></div>Veriler Eşitleniyor...</div>
+    <div id="orders-table-wrap">
+      <table id="orders-table">
+        <thead>
+          <tr>
+            <th>Seller ID</th>
+            <th>Ürün Bilgisi</th>
+            <th>ASIN</th>
+            <th>Durum</th>
+            <th>En İyi Fiyat</th>
+            <th>Depo / Kod</th>
+            <th>Amazon Sipariş No</th>
+            <th>Son Teslimat</th>
+            <th>Hızlı İşlemler</th>
+          </tr>
+        </thead>
+        <tbody id="orders-body"></tbody>
+      </table>
+    </div>
+    <div id="empty-state" class="empty-state" style="display:none">
+      <div class="empty-icon">📭</div>
+      <div class="empty-text">Bu filtreye uygun sipariş bulunamadı.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ORDER DETAIL MODAL -->
+<div id="modal-overlay">
+  <div id="modal">
+    <button id="modal-close" onclick="closeModal()">✕</button>
+    <div id="modal-title">—</div>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+let CFG = { url: '', key: '', mkts: ['78524', '87709'] };
+let _allOrders = [];   
+let _activeFilter = 'all';
+let _activeMkt    = null;
+let _autoRefresh  = null;
+
+function loadConfig() {
+  const saved = localStorage.getItem('sf_cfg');
+  if (saved) {
+    try { CFG = JSON.parse(saved); return true; }
+    catch(e) {}
+  }
+  return false;
+}
+
+function saveConfig() {
+  const url  = document.getElementById('cfg-url').value.trim().replace(/\/$/, '');
+  const key  = document.getElementById('cfg-key').value.trim();
+  const mkts = document.getElementById('cfg-mkts').value.split(',').map(s => s.trim()).filter(Boolean);
+  if (!url || !key) { showToast('URL ve Key alanları zorunludur!', 'error'); return; }
+  CFG = { url, key, mkts };
+  localStorage.setItem('sf_cfg', JSON.stringify(CFG));
+  document.getElementById('config-overlay').style.display = 'none';
+  init();
+}
+
+function openSettings() {
+  document.getElementById('cfg-url').value  = CFG.url  || '';
+  document.getElementById('cfg-key').value  = CFG.key  || '';
+  document.getElementById('cfg-mkts').value = (CFG.mkts || []).join(',');
+  document.getElementById('config-overlay').style.display = 'flex';
+}
+
+document.getElementById('cfg-save').onclick = saveConfig;
+
+// ─── SUPABASE REST ────────────────────────────────────────────────────────────
+async function sbGet(key) {
+  const res = await fetch(`${CFG.url}/rest/v1/sf_store?key=eq.${encodeURIComponent(key)}&select=value&limit=1`, {
+    headers: {
+      'apikey': CFG.key,
+      'Authorization': `Bearer ${CFG.key}`,
+      'Content-Type': 'application/json',
+    }
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(()=>'');
+    console.error('[SF Admin] sbGet hata:', res.status, txt.slice(0,200), 'key:', key);
+    throw new Error(`HTTP ${res.status}: ${txt.slice(0,100)}`);
+  }
+  const rows = await res.json();
+  if (!rows.length) return null;
+  const val = rows[0].value;
+  if (typeof val === 'string') {
+    try { return JSON.parse(val); } catch(e) { return val; }
+  }
+  return val;
+}
+
+async function sbPut(key, value) {
+  const res = await fetch(`${CFG.url}/rest/v1/sf_store`, {
+    method: 'POST',
+    headers: {
+      'apikey': CFG.key,
+      'Authorization': `Bearer ${CFG.key}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates,return=minimal',
+    },
+    body: JSON.stringify({ key, value })
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(()=>'');
+    console.error('[SF Admin] sbPut hata:', res.status, txt.slice(0,200), 'key:', key);
+    throw new Error(`HTTP ${res.status}: ${txt.slice(0,100)}`);
+  }
+}
+
+// ─── DATA FETCH ───────────────────────────────────────────────────────────────
+async function fetchStoreName(mktId) {
+  try {
+    const raw = await sbGet('ACCOUNTS');
+    if (!raw) return `Mağaza ${mktId}`;
+    const accounts = (typeof raw === 'object') ? raw : JSON.parse(raw);
+    const account = Array.isArray(accounts)
+      ? accounts.find(a => String(a.id) === String(mktId) || String(a.marketPlaceId) === String(mktId))
+      : null;
+    return account?.storeName || account?.name || `Mağaza ${mktId}`;
+  } catch(e) { return `Mağaza ${mktId}`; }
+}
+
+function getOrderState(order) {
+  if (order.skipped)       return 'skipped';
+  if (order.bid)           return 'done';
+  if (order.amazonStarted) return 'amazon';
+  if (order.whName)        return 'ordered';
+  if (order.prices)        return 'priced';
+  return 'new';
+}
+
+function stateLabel(state) {
+  return {
+    new: 'Yeni', priced: 'Fiyatlı', ordered: 'Depoda',
+    amazon: 'Amazon', done: 'Tamamlandı', skipped: 'Atlandı'
+  }[state] || state;
+}
+
+function stateCls(state) {
+  return { new:'s-new', priced:'s-priced', ordered:'s-ordered', amazon:'s-amazon', done:'s-done', skipped:'s-skipped' }[state] || '';
+}
+
+async function fetchAllData() {
+  setConnState('loading');
+  _allOrders = [];
+
+  const storeNames = {};
+  for (const mktId of CFG.mkts) {
+    storeNames[mktId] = await fetchStoreName(mktId);
+  }
+
+  for (const mktId of CFG.mkts) {
+    try {
+      const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
+      if (!raw) continue;
+      // CRITICAL FIX: raw is likely already an object if Supabase stores it as jsonb
+      const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
+      
+      for (const [sid, order] of Object.entries(pending)) {
+        let prices = order.prices || null;
+        if (!prices) {
+          try {
+            const pr = await sbGet(`ORDER_BOT_PRICE_${sid}`);
+            if (pr) prices = (typeof pr === 'object') ? pr : JSON.parse(pr);
+          } catch(e) {}
+        }
+        _allOrders.push({
+          ...order,
+          sid,
+          mktId,
+          storeName: storeNames[mktId] || mktId,
+          prices,
+        });
+      }
+    } catch(e) {
+      console.error(`mktId ${mktId} fetch error:`, e);
+    }
+  }
+
+  // Amazon status
+  let azStatus = null;
+  try {
+    const azRaw = await sbGet('AMAZON_AUTO_ORDER');
+    if (azRaw && azRaw !== '' && azRaw !== 'null') {
+      azStatus = (typeof azRaw === 'object') ? azRaw : JSON.parse(azRaw);
+    }
+  } catch(e) {}
+
+  renderAmazonStatus(azStatus);
+  renderStores(storeNames);
+  renderOrders();
+  updateTopStats();
+  setConnState('ok');
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function renderAmazonStatus(job) {
+  const el   = document.getElementById('amazon-status');
+  const det  = document.getElementById('az-detail');
+  const badge = document.getElementById('az-badge');
+
+  el.className = '';
+  if (!job || job.status === '' || job === null) {
+    el.classList.add('idle');
+    det.textContent = 'Sistem Beklemede — Aktif iş bulunmuyor.';
+    badge.className = 'az-badge idle';
+    badge.textContent = 'IDLE';
+    return;
+  }
+  const s = job.status || '';
+  const txt = `${job.sid || ''} → ${job.whName || ''} ${job.orderCode || ''} ${job.asin ? '('+job.asin+')' : ''}`.trim();
+  det.textContent = txt || '—';
+
+  if (s === 'PENDING' || s === 'IN_PROGRESS') {
+    el.classList.add('in-progress');
+    badge.className = 'az-badge progress';
+    badge.textContent = s === 'IN_PROGRESS' ? 'ÇALIŞIYOR' : 'BEKLİYOR';
+  } else if (s === 'FAILED') {
+    el.classList.add('failed');
+    badge.className = 'az-badge failed';
+    badge.textContent = 'BAŞARISIZ';
+    if (job.error) det.textContent += ' — ' + job.error.slice(0,80);
+  } else {
+    el.classList.add('idle');
+    badge.className = 'az-badge idle';
+    badge.textContent = s || 'IDLE';
+  }
+}
+
+function renderStores(storeNames) {
+  const grid = document.getElementById('stores-grid');
+  grid.innerHTML = '';
+
+  const mktCounts = {};
+  for (const mktId of CFG.mkts) {
+    mktCounts[mktId] = { new:0, active:0, done:0, skipped:0, total:0 };
+  }
+  for (const order of _allOrders) {
+    const m = mktCounts[order.mktId];
+    if (!m) continue;
+    const state = getOrderState(order);
+    m.total++;
+    if (state === 'new')    m.new++;
+    else if (state === 'done') m.done++;
+    else if (state === 'skipped') m.skipped++;
+    else m.active++;
+  }
+
+  // "All" kart
+  const allCard = document.createElement('div');
+  allCard.className = 'store-card' + (_activeMkt === null ? ' active' : '');
+  const totalPending = Object.values(mktCounts).reduce((s,m) => s + m.new + m.active, 0);
+  const totalDone    = Object.values(mktCounts).reduce((s,m) => s + m.done, 0);
+  const totalAll     = Object.values(mktCounts).reduce((s,m) => s + m.total, 0);
+  allCard.innerHTML = `
+    <div class="store-name">Tüm Mağazalar</div>
+    <div class="store-mkt">Birleşik Görünüm</div>
+    <div class="store-counts">
+      <div class="sc"><div class="sc-num orange">${totalPending}</div><div class="sc-label">Bekleyen</div></div>
+      <div class="sc"><div class="sc-num green">${totalDone}</div><div class="sc-label">Tamamlanan</div></div>
+      <div class="sc"><div class="sc-num gray">${totalAll}</div><div class="sc-label">Toplam</div></div>
+    </div>`;
+  allCard.onclick = () => { _activeMkt = null; renderStores(storeNames); renderOrders(); };
+  grid.appendChild(allCard);
+
+  for (const mktId of CFG.mkts) {
+    const m = mktCounts[mktId];
+    const card = document.createElement('div');
+    card.className = 'store-card' + (_activeMkt === mktId ? ' active' : '');
+    card.innerHTML = `
+      <div class="store-name">${storeNames[mktId] || mktId}</div>
+      <div class="store-mkt">ID: ${mktId}</div>
+      <div class="store-counts">
+        <div class="sc"><div class="sc-num orange">${m.new}</div><div class="sc-label">Yeni</div></div>
+        <div class="sc"><div class="sc-num blue">${m.active}</div><div class="sc-label">Aktif</div></div>
+        <div class="sc"><div class="sc-num green">${m.done}</div><div class="sc-label">Tamam</div></div>
+      </div>`;
+    card.onclick = () => { _activeMkt = mktId; renderStores(storeNames); renderOrders(); };
+    grid.appendChild(card);
+  }
+}
+
+function renderOrders() {
+  const tbody = document.getElementById('orders-body');
+  tbody.innerHTML = '';
+
+  let orders = _activeFilter === 'all'
+    ? _allOrders
+    : _allOrders.filter(o => getOrderState(o) === _activeFilter);
+
+  if (_activeMkt) {
+    orders = orders.filter(o => o.mktId === _activeMkt);
+  }
+
+  orders.sort((a,b) => (b.detectedAt||0) - (a.detectedAt||0));
+
+  document.getElementById('empty-state').style.display = orders.length ? 'none' : 'block';
+  document.getElementById('orders-table-wrap').style.display = orders.length ? '' : 'none';
+
+  for (const order of orders) {
+    const state = getOrderState(order);
+    const tr = document.createElement('tr');
+    tr.onclick = () => openModal(order);
+
+    let bestPrice = null, bestWh = null;
+    if (order.prices) {
+      for (const [wh, p] of Object.entries(order.prices)) {
+        if (!p || wh.startsWith('_')) continue;
+        const pVal = typeof p === 'number' ? p : (p?.priceUSD ?? p?.price ?? null);
+        if (pVal !== null && (bestPrice === null || pVal < bestPrice)) {
+          bestPrice = pVal; bestWh = wh;
+        }
+      }
+    }
+    const priceHtml = (order.prices && bestPrice !== null)
+      ? `<span class="price-best">$${parseFloat(bestPrice).toFixed(2)} <span style="color:var(--text3);font-weight:400;font-family:var(--sans);font-size:11px;margin-left:4px">${bestWh||''}</span></span>`
+      : `<span class="price-na">—</span>`;
+
+    const delivDate = order.deliveryEndDate
+      ? new Date(order.deliveryEndDate).toLocaleDateString('tr-TR', {day:'2-digit', month:'short'})
+      : '—';
+
+    tr.innerHTML = `
+      <td class="sid-cell">${order.sid || order.sellerOrderId || '—'}</td>
+      <td class="product-cell" title="${order.productTitle||''}">${order.productTitle || '—'}</td>
+      <td class="asin-cell">${order.asin || '—'}</td>
+      <td><span class="state-badge ${stateCls(state)}">${stateLabel(state)}</span></td>
+      <td class="price-cell">${priceHtml}</td>
+      <td class="wh-cell">${order.whName ? `${order.whName} <br><span style="font-family:var(--mono);color:var(--text);font-size:11px">${order.orderCode||''}</span>` : '—'}</td>
+      <td class="bid-cell">${order.bid ? `<a href="https://amazon.com/gp/css/order-details?orderID=${order.bid}" target="_blank" onclick="event.stopPropagation()">${order.bid}</a>` : '—'}</td>
+      <td class="date-cell">${delivDate}</td>
+      <td class="action-cell" onclick="event.stopPropagation()">${buildActions(order, state)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function buildActions(order, state) {
+  const sid   = order.sid;
+  const mktId = order.mktId;
+  let html = '';
+  if (state === 'new') {
+    html += `<button class="act-btn btn-price" onclick="doPrice(event, '${sid}','${mktId}')">💰 Fiyat Al</button>`;
+    html += `<button class="act-btn btn-skip"  onclick="doSkip('${sid}','${mktId}')">✕ Atla</button>`;
+  }
+  if (state === 'priced') {
+    html += `<button class="act-btn btn-order" onclick="openModal(${JSON.stringify(order).replace(/"/g,'&quot;')})">📦 Depo Seç</button>`;
+    html += `<button class="act-btn btn-price" onclick="doPrice(event, '${sid}','${mktId}')">🔄</button>`;
+  }
+  if (state === 'ordered') {
+    html += `<button class="act-btn btn-amazon" onclick="doAmazon(event, '${sid}','${mktId}')">🛒 Amazon'a Geç</button>`;
+  }
+  if (state === 'amazon') {
+    html += `<button class="act-btn btn-cancel" onclick="doCancelAmazon(event, '${sid}','${mktId}')">🛑 İptal Et</button>`;
+  }
+  return html || '<span style="color:var(--text3);font-size:12px">—</span>';
+}
+
+function updateTopStats() {
+  const pending = _allOrders.filter(o => !['done','skipped'].includes(getOrderState(o))).length;
+  const amazon  = _allOrders.find(o => getOrderState(o) === 'amazon');
+  document.getElementById('stat-pending').textContent = pending;
+  document.getElementById('stat-amazon').textContent  = amazon ? amazon.sid : 'Yok';
+  document.getElementById('conn-dot').className = 'tstat-dot green';
+  document.getElementById('conn-label').textContent = 'Sistem Aktif';
+}
+
+// ─── FILTER ───────────────────────────────────────────────────────────────────
+function setFilter(f) {
+  _activeFilter = f;
+  document.querySelectorAll('.ftab').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderOrders();
+}
+
+// ─── MODAL ────────────────────────────────────────────────────────────────────
+function openModal(order) {
+  const state = getOrderState(order);
+  document.getElementById('modal-title').textContent = order.productTitle || order.sid || 'Sipariş Detayı';
+
+  let pricesHtml = '';
+  if (order.prices) {
+    let bestP = Infinity;
+    for (const [wh, v] of Object.entries(order.prices)) {
+      if (wh.startsWith('_')) continue;
+      const pv = typeof v === 'number' ? v : (v?.priceUSD ?? v?.price ?? null);
+      if (pv !== null && pv < bestP) bestP = pv;
+    }
+
+    // Telegram'daki depo isimlendirmeleri (Birebir aynı)
+    const depoLabels = {
+      SF:           'Shippinglot',
+      PREPLARGE:    'Preplarge (+$1.60)',
+      COMFYSHIP:    'Comfyship',
+      FULLFILLONUS: 'Fullfillonus (+$0.80)'
+    };
+
+    pricesHtml = `<div class="modal-prices">
+      <div class="modal-prices-title">Depo Fiyat Karşılaştırması</div>
+      ${Object.entries(order.prices).filter(([wh])=>!wh.startsWith('_')).map(([wh,p]) => {
+          const pv = typeof p === 'number' ? p : (p?.priceUSD ?? p?.price ?? null);
+          const isBest = pv !== null && pv === bestP;
+          const label = depoLabels[wh] || wh;
+          
+          // Kargo firması bilgisi varsa ekle
+          let carrierText = '';
+          if (typeof p === 'object' && p !== null && p.carrierName) {
+              carrierText = `<div style="font-size: 11px; color: var(--text3); font-weight: 400; font-family: var(--sans); margin-top: 4px;">(${p.carrierName})</div>`;
+          }
+          
+          // Hata mesajı varsa ekle (Telegram'daki gibi)
+          let errorText = '';
+          if (typeof p === 'object' && p !== null && !p.ok && p.error) {
+              errorText = `<div style="font-size: 11px; color: var(--red); font-weight: 500; font-family: var(--sans); margin-top: 4px;">❌ ${p.error}</div>`;
+          }
+
+          return `<div class="price-row" style="align-items: center;">
+          <div class="price-row-name" style="display: flex; flex-direction: column; justify-content: center;">
+            <span style="font-weight: ${isBest ? '600' : '500'}; color: ${isBest ? 'var(--text)' : 'var(--text2)'};">${isBest ? '⭐ ' : ''}${label}</span>
+            ${carrierText}
+            ${errorText}
+          </div>
+          <span class="price-row-val ${isBest?'best':''}">${pv !== null ? '$'+parseFloat(pv).toFixed(2) : (errorText ? '' : '—')}</span>
+        </div>`;}).join('')}
+    </div>`;
+  }
+
+  const detects = order.detectedAt ? new Date(order.detectedAt).toLocaleString('tr-TR') : '—';
+  const delivDate = order.deliveryEndDate
+    ? new Date(order.deliveryEndDate).toLocaleString('tr-TR')
+    : '—';
+
+  document.getElementById('modal-content').innerHTML = `
+    <div class="detail-grid">
+      <div class="detail-item">
+        <div class="detail-key">Seller ID</div>
+        <div class="detail-val" style="font-family:var(--mono);">${order.sid||'—'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-key">Seller Order ID</div>
+        <div class="detail-val" style="font-family:var(--mono);">${order.sellerOrderId||'—'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-key">ASIN</div>
+        <div class="detail-val"><a href="https://amazon.com/dp/${order.asin}" target="_blank" style="font-family:var(--mono);">${order.asin||'—'}</a></div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-key">Durum</div>
+        <div class="detail-val" style="background:transparent; padding:0; border:none;"><span class="state-badge ${stateCls(state)}">${stateLabel(state)}</span></div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-key">Mağaza</div>
+        <div class="detail-val">${order.storeName||order.mktId}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-key">Teslimat Son</div>
+        <div class="detail-val">${delivDate}</div>
+      </div>
+      ${order.whName ? `
+      <div class="detail-item">
+        <div class="detail-key">Depo</div>
+        <div class="detail-val">${order.whName}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-key">Depo Kodu</div>
+        <div class="detail-val" style="font-family:var(--mono);">${order.orderCode||'—'}</div>
+      </div>` : ''}
+      ${order.bid ? `
+      <div class="detail-item full">
+        <div class="detail-key">Amazon Order ID</div>
+        <div class="detail-val"><a href="https://amazon.com/gp/css/order-details?orderID=${order.bid}" target="_blank" style="font-family:var(--mono);">${order.bid}</a></div>
+      </div>` : ''}
+      <div class="detail-item full">
+        <div class="detail-key">Sistem Tespit Zamanı</div>
+        <div class="detail-val">${detects}</div>
+      </div>
+    </div>
+    ${pricesHtml}
+    <div class="modal-actions">
+      ${state==='new' ? `<button class="act-btn btn-price" onclick="doPrice(event, '${order.sid}','${order.mktId}');closeModal()">💰 Fiyat Al</button>` : ''}
+      ${state==='priced' ? `
+        <button class="act-btn btn-order" onclick="doOrder(event, '${order.sid}','${order.mktId}','PREPLARGE');closeModal()">📦 PREPLARGE</button>
+        <button class="act-btn btn-order" onclick="doOrder(event, '${order.sid}','${order.mktId}','COMFYSHIP');closeModal()">📦 COMFYSHIP</button>
+        <button class="act-btn btn-order" onclick="doOrder(event, '${order.sid}','${order.mktId}','FULLFILLONUS');closeModal()">📦 FULLFILLONUS</button>
+        <button class="act-btn btn-order" onclick="doOrder(event, '${order.sid}','${order.mktId}','SF');closeModal()">📦 SHIPPINGLOT</button>
+      ` : ''}
+      ${state==='ordered' ? `<button class="act-btn btn-amazon" onclick="doAmazon(event, '${order.sid}','${order.mktId}');closeModal()">🛒 Amazon'a Geç</button>` : ''}
+      ${state==='amazon' ? `<button class="act-btn btn-cancel" onclick="doCancelAmazon(event, '${order.sid}','${order.mktId}');closeModal()">🛑 İptal Et</button>` : ''}
+      ${!['done','skipped'].includes(state) ? `<button class="act-btn btn-skip" onclick="doSkip('${order.sid}','${order.mktId}');closeModal()">✕ Atla</button>` : ''}
+    </div>
+  `;
+
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+document.getElementById('modal-overlay').onclick = e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+};
+
+// ─── ACTIONS ─────────────────────────────────────────────────────────────────
+// JSON.PARSE FIX: All raw inputs are safely parsed using a typeof check.
+
+async function doPrice(event, sid, mktId) {
+  // Görsel Efekt
+  if (event && event.currentTarget) {
+    const btn = event.currentTarget;
+    btn.innerHTML = '⏳ Alınıyor...';
+    btn.style.opacity = '0.6';
+    btn.style.pointerEvents = 'none';
+  }
+
+  showToast(`💰 Fiyat isteği: ${sid}`, 'success');
+  try {
+    const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
+    if (!raw) return;
+    const pending = (typeof raw === 'object') ? raw : JSON.parse(raw); 
+    
+    if (pending[sid]) {
+      pending[sid].adminPriceRequest = Date.now();
+      await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
+      setTimeout(refreshAll, 2000);
+    }
+  } catch(e) { showToast('Hata: ' + e.message, 'error'); }
+}
+
+async function doOrder(event, sid, mktId, whName) {
+  // Görsel Efekt
+  if (event && event.currentTarget) {
+    const btn = event.currentTarget;
+    btn.innerHTML = '⏳ İşleniyor...';
+    btn.style.opacity = '0.6';
+    btn.style.pointerEvents = 'none';
+  }
+
+  showToast(`📦 ${whName} seçildi: ${sid}`, 'success');
+  try {
+    const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
+    if (!raw) return;
+    const pending = (typeof raw === 'object') ? raw : JSON.parse(raw); 
+    
+    if (pending[sid]) {
+      pending[sid].adminOrderRequest = { whName, requestedAt: Date.now() };
+      await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
+      setTimeout(refreshAll, 2000);
+    }
+  } catch(e) { showToast('Hata: ' + e.message, 'error'); }
+}
+
+async function doAmazon(event, sid, mktId) {
+  if (!confirm(`${sid} için Amazon siparişi başlatılsın mı?`)) return;
+  
+  // Görsel Efekt
+  if (event && event.currentTarget) {
+    const btn = event.currentTarget;
+    btn.innerHTML = '⏳ Başlatılıyor...';
+    btn.style.opacity = '0.6';
+    btn.style.pointerEvents = 'none';
+  }
+
+  try {
+    const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
+    if (!raw) return;
+    const pending = (typeof raw === 'object') ? raw : JSON.parse(raw); 
+    
+    const order = pending[sid];
+    if (!order) { showToast('Sipariş bulunamadı', 'error'); return; }
+    await sbPut('AMAZON_AUTO_ORDER', JSON.stringify({
+      status:    'PENDING',
+      sid,
+      mktId,
+      whName:    order.whName,
+      orderCode: order.orderCode,
+      asin:      order.asin,
+      startedAt: Date.now(),
+    }));
+    showToast('🛒 Amazon siparişi başlatıldı!', 'success');
+    setTimeout(refreshAll, 2000);
+  } catch(e) { showToast('Hata: ' + e.message, 'error'); }
+}
+
+async function doCancelAmazon(event, sid, mktId) {
+  if (!confirm('Amazon siparişi iptal edilsin mi?')) return;
+  
+  // Görsel Efekt
+  if (event && event.currentTarget) {
+    const btn = event.currentTarget;
+    btn.innerHTML = '⏳ İptal ediliyor...';
+    btn.style.opacity = '0.6';
+    btn.style.pointerEvents = 'none';
+  }
+
+  try {
+    await sbPut('AMAZON_AUTO_ORDER', '');
+    const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
+    if (raw) {
+      const pending = (typeof raw === 'object') ? raw : JSON.parse(raw); 
+      if (pending[sid]) {
+        delete pending[sid].amazonStarted;
+        await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
+      }
+    }
+    showToast('Amazon siparişi iptal edildi', 'success');
+    setTimeout(refreshAll, 2000);
+  } catch(e) { showToast('Hata: ' + e.message, 'error'); }
+}
+
+async function doSkip(sid, mktId) {
+  if (!confirm(`${sid} atlanacak, emin misiniz?`)) return;
+  try {
+    const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
+    if (!raw) return;
+    const pending = (typeof raw === 'object') ? raw : JSON.parse(raw); // FIX
+    if (pending[sid]) {
+      pending[sid].skipped = true;
+      await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
+      showToast('Sipariş atlandı', 'success');
+      setTimeout(refreshAll, 1500);
+    }
+  } catch(e) { showToast('Hata: ' + e.message, 'error'); }
+}
+
+// ─── UTIL ─────────────────────────────────────────────────────────────────────
+function setConnState(state) {
+  const dot   = document.getElementById('conn-dot');
+  const label = document.getElementById('conn-label');
+  const btn   = document.getElementById('refresh-btn');
+  if (state === 'loading') {
+    dot.className   = 'tstat-dot orange';
+    label.textContent = 'Eşitleniyor...';
+    btn.classList.add('spinning');
+  } else if (state === 'ok') {
+    dot.className   = 'tstat-dot green';
+    label.textContent = 'Sistem Aktif';
+    btn.classList.remove('spinning');
+  } else {
+    dot.className   = 'tstat-dot';
+    label.textContent = 'Hata';
+    btn.classList.remove('spinning');
+  }
+}
+
+let _toastTimer;
+function showToast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.innerHTML = type === 'success' ? `✅ ${msg}` : `❌ ${msg}`;
+  el.className = `show ${type}`;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+async function refreshAll() {
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('spinning');
+  try { await fetchAllData(); }
+  catch(e) {
+    setConnState('error');
+    showToast('Bağlantı hatası: ' + e.message, 'error');
+  }
+  setTimeout(() => btn.classList.remove('spinning'), 500);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+async function init() {
+  document.getElementById('loading').style.display = 'block';
+  await refreshAll();
+  document.getElementById('loading').style.display = 'none';
+
+  clearInterval(_autoRefresh);
+  _autoRefresh = setInterval(refreshAll, 30000);
+}
+
+if (loadConfig() && CFG.url && CFG.key) {
+  document.getElementById('config-overlay').style.display = 'none';
+  init();
+} else {
+  setConnState('error');
+}
+</script>
+</body>
+</html>
