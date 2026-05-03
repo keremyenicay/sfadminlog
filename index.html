@@ -1218,7 +1218,16 @@ async function fetchAllData() {
             if (pr) prices = (typeof pr === 'object') ? pr : JSON.parse(pr);
           } catch(e) {}
         }
-        _allOrders.push({ ...order, sid, mktId, storeName: storeNames[mktId] || mktId, prices });
+        
+        // 🛠️ SADECE BURASI DEĞİŞTİ: buyerOrderId varsa bunu bid olarak kabul et
+        _allOrders.push({ 
+          ...order, 
+          sid, 
+          mktId, 
+          storeName: storeNames[mktId] || mktId, 
+          prices,
+          bid: order.bid || order.buyerOrderId 
+        });
       }
     } catch(e) { console.error(`mktId ${mktId} fetch error:`, e); }
   }
