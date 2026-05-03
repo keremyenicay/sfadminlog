@@ -1207,9 +1207,21 @@ async function fetchAllData() {
 
   for (const mktId of CFG.mkts) {
     try {
+      // 1. Önce bekleyenleri (Pending) çekiyoruz
       const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
       if (!raw) continue;
       const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
+
+      // 2. 🛠️ YENİ: Asıl DB'yi (Tamamlananların olduğu hücreyi) çekiyoruz
+      let dbData = {};
+      try {
+        const rawDb = await sbGet(`DB_${mktId}`);
+        if (rawDb) {
+            dbData = (typeof rawDb === 'object') ? rawDb : JSON.parse(rawDb);
+        }
+      } catch(e) { console.warn(`DB_${mktId} çekilemedi.`); }
+
+      // 3. Siparişleri ekrana basmaya başlıyoruz
       for (const [sid, order] of Object.entries(pending)) {
         let prices = order.prices || null;
         if (!prices) {
@@ -1219,14 +1231,19 @@ async function fetchAllData() {
           } catch(e) {}
         }
         
-        // 🛠️ SADECE BURASI DEĞİŞTİ: buyerOrderId varsa bunu bid olarak kabul et
+        // 🛠️ AKILLI KONTROL: Eğer asıl DB'de bu sipariş varsa ve buyerOrderId girilmişse, panel bunu anlasın
+        let finalBid = order.bid || order.buyerOrderId; // Önce PENDING içinde arar
+        if (!finalBid && dbData[sid] && dbData[sid].buyerOrderId) {
+            finalBid = dbData[sid].buyerOrderId; // Eğer PENDING'te yoksa, gider DB_78524 içinden bulur!
+        }
+
         _allOrders.push({ 
           ...order, 
           sid, 
           mktId, 
           storeName: storeNames[mktId] || mktId, 
           prices,
-          bid: order.bid || order.buyerOrderId 
+          bid: finalBid // Bulduğumuz Amazon ID'sini buraya yapıştırıyoruz
         });
       }
     } catch(e) { console.error(`mktId ${mktId} fetch error:`, e); }
