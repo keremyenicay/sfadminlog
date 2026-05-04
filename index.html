@@ -1266,10 +1266,6 @@ function stateCls(state) {
 }
 
 async function fetchAllData() {
-  // Eğer zaten fetch devam ediyorsa başlatma
-  if (_isRefreshing) return;
-  _isRefreshing = true;
-
   setConnState('loading');
 
   // ÖNEMLİ: Mevcut listeyi sıfırlamıyoruz, geçici bir listeye topluyoruz
@@ -1342,8 +1338,6 @@ async function fetchAllData() {
   renderOrders();
   updateTopStats();
   setConnState('ok');
-
-  _isRefreshing = false;
 }
 
 // ─── AMAZON LOG ───────────────────────────────────────────────────────────────
@@ -1772,11 +1766,7 @@ async function doPrice(event, sid, mktId) {
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
 
   _pendingOps.delete(sid);
-  // Sayfayı sıfırlamadan taze veri çek
-  if (!_isRefreshing) {
-    _isRefreshing = true;
-    try { await fetchAllData(); } finally { _isRefreshing = false; }
-  }
+  await refreshAll();
 }
 
 async function doOrder(event, sid, mktId, whName) {
@@ -1801,10 +1791,7 @@ async function doOrder(event, sid, mktId, whName) {
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
 
   _pendingOps.delete(sid);
-  if (!_isRefreshing) {
-    _isRefreshing = true;
-    try { await fetchAllData(); } finally { _isRefreshing = false; }
-  }
+  await refreshAll();
 }
 
 async function doAmazon(event, sid, mktId) {
@@ -1829,10 +1816,7 @@ async function doAmazon(event, sid, mktId) {
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
 
   _pendingOps.delete(sid);
-  if (!_isRefreshing) {
-    _isRefreshing = true;
-    try { await fetchAllData(); } finally { _isRefreshing = false; }
-  }
+  await refreshAll();
 }
 
 async function doCancelAmazon(event, sid, mktId) {
@@ -1894,9 +1878,16 @@ function showToast(msg, type='success') {
 }
 
 async function refreshAll() {
-  if (_isRefreshing) return; // Zaten yenileniyor, pas geç
-  try { await fetchAllData(); }
-  catch(e) { setConnState('error'); showToast('Bağlantı hatası: ' + e.message, 'error'); }
+  if (_isRefreshing) return; // Zaten çalışıyor, pas geç
+  _isRefreshing = true;
+  try {
+    await fetchAllData();
+  } catch(e) {
+    setConnState('error');
+    showToast('Bağlantı hatası: ' + e.message, 'error');
+  } finally {
+    _isRefreshing = false;
+  }
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
