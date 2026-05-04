@@ -334,6 +334,63 @@ body::before {
 }
 
 /* ══════════════════════════════════════
+   AMAZON LOG TERMINAL
+══════════════════════════════════════ */
+#amazon-log-panel {
+  background: #0a0f1a;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  overflow: hidden;
+  display: none;
+}
+#amazon-log-panel.visible { display: block; }
+.az-log-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+.az-log-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  flex: 1;
+}
+.az-log-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(16,185,129,.2);
+  animation: pulse 1.2s infinite;
+}
+.az-log-dot.idle { background: var(--text3); box-shadow: none; animation: none; }
+#az-log-body {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: #7dd3fc;
+  padding: 12px 14px;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+#az-log-body::-webkit-scrollbar { width: 4px; }
+#az-log-body::-webkit-scrollbar-thumb { background: var(--bg4); }
+.log-line { display: flex; gap: 8px; }
+.log-ts { color: var(--text3); flex-shrink: 0; }
+.log-txt { color: #7dd3fc; }
+.log-txt.ok  { color: var(--green2); }
+.log-txt.err { color: var(--red); }
+.log-txt.warn { color: var(--yellow); }
+
+/* ══════════════════════════════════════
    AMAZON STATUS
 ══════════════════════════════════════ */
 #amazon-status {
@@ -1030,6 +1087,16 @@ td {
 
 <!-- MAIN -->
 <div id="main">
+  <!-- Amazon Log Terminal -->
+  <div id="amazon-log-panel">
+    <div class="az-log-header">
+      <div class="az-log-dot idle" id="az-log-dot"></div>
+      <div class="az-log-title">Amazon Oto-Sipariş · Terminal</div>
+      <button onclick="document.getElementById('amazon-log-panel').classList.remove('visible')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 6px">✕</button>
+    </div>
+    <div id="az-log-body"></div>
+  </div>
+
   <!-- Amazon Status -->
   <div id="amazon-status" class="idle">
     <div class="az-icon">🤖</div>
@@ -1108,6 +1175,8 @@ let _allOrders    = [];
 let _activeFilter = 'all';
 let _activeMkt    = null;
 let _autoRefresh  = null;
+let _isRefreshing = false;   // çift fetch engeli
+let _pendingOps   = new Set(); // hangi sid'ler işlem bekliyor
 
 function loadConfig() {
   const saved = localStorage.getItem('sf_cfg');
@@ -1197,8 +1266,14 @@ function stateCls(state) {
 }
 
 async function fetchAllData() {
+  // Eğer zaten fetch devam ediyorsa başlatma
+  if (_isRefreshing) return;
+  _isRefreshing = true;
+
   setConnState('loading');
-  _allOrders = [];
+
+  // ÖNEMLİ: Mevcut listeyi sıfırlamıyoruz, geçici bir listeye topluyoruz
+  const newOrders = [];
 
   const storeNames = {};
   for (const mktId of CFG.mkts) {
@@ -1207,30 +1282,23 @@ async function fetchAllData() {
 
   for (const mktId of CFG.mkts) {
     try {
-      // 1. Bekleyen siparişleri çek
       const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
       if (!raw) continue;
       const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
 
-      // 2. Asıl DB'yi (Tamamlananları) çek
       let dbData = {};
       try {
         const rawDb = await sbGet(`DB_${mktId}`);
-        if (rawDb) {
-            dbData = (typeof rawDb === 'object') ? rawDb : JSON.parse(rawDb);
-        }
+        if (rawDb) dbData = (typeof rawDb === 'object') ? rawDb : JSON.parse(rawDb);
       } catch(e) { console.warn(`DB_${mktId} çekilemedi.`); }
 
-      let pendingUpdated = false; // Supabase'den silinen kayıt olup olmadığını takip edeceğiz
+      let pendingUpdated = false;
 
-      // 3. Siparişleri tara
       for (const [sid, order] of Object.entries(pending)) {
-        
-        // 🚀 DİKKAT: SİPARİŞ DB'DE VARSA PENDING'DEN KALICI OLARAK SİL!
         if (dbData[sid] && dbData[sid].buyerOrderId) {
-            delete pending[sid]; // JSON'dan uçur
-            pendingUpdated = true; // Supabase'i güncellememiz gerektiğini işaretle
-            continue; // Ekrana çizme, bu iş zaten bitmiş!
+          delete pending[sid];
+          pendingUpdated = true;
+          continue;
         }
 
         let prices = order.prices || null;
@@ -1240,24 +1308,26 @@ async function fetchAllData() {
             if (pr) prices = (typeof pr === 'object') ? pr : JSON.parse(pr);
           } catch(e) {}
         }
-        
-        _allOrders.push({ 
-          ...order, 
-          sid, 
-          mktId, 
-          storeName: storeNames[mktId] || mktId, 
-          prices 
+
+        newOrders.push({
+          ...order,
+          sid,
+          mktId,
+          storeName: storeNames[mktId] || mktId,
+          prices
         });
       }
 
-      // 🧹 EĞER TEMİZLİK YAPILDIYSA SUPABASE'İ GÜNCELLE VE HÜCREYİ TEMİZLE
       if (pendingUpdated) {
-         await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
-         console.log(`[Temizlik] ${mktId} için tamamlanan siparişler Supabase PENDING hücresinden silindi!`);
+        await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
+        console.log(`[Temizlik] ${mktId} için tamamlanan siparişler silindi.`);
       }
 
     } catch(e) { console.error(`mktId ${mktId} fetch error:`, e); }
   }
+
+  // Tek seferde değiştir → çift render yok
+  _allOrders = newOrders;
 
   let azStatus = null;
   try {
@@ -1272,6 +1342,85 @@ async function fetchAllData() {
   renderOrders();
   updateTopStats();
   setConnState('ok');
+
+  _isRefreshing = false;
+}
+
+// ─── AMAZON LOG ───────────────────────────────────────────────────────────────
+let _azLogEntries = [];
+let _azLogSid     = null;
+
+function parseAmazonLog(job) {
+  if (!job) return [];
+  // Log array varsa direkt kullan
+  if (Array.isArray(job.log)) return job.log;
+  // Alternatif: logs field
+  if (Array.isArray(job.logs)) return job.logs;
+  // Tek string log
+  if (typeof job.log === 'string' && job.log) return job.log.split('\n').filter(Boolean);
+  return [];
+}
+
+function renderAmazonLog(job) {
+  const panel  = document.getElementById('amazon-log-panel');
+  const body   = document.getElementById('az-log-body');
+  const dot    = document.getElementById('az-log-dot');
+
+  if (!job || !job.sid) {
+    panel.classList.remove('visible');
+    _azLogEntries = [];
+    _azLogSid = null;
+    return;
+  }
+
+  // Yeni iş mi başladı?
+  if (job.sid !== _azLogSid) {
+    _azLogEntries = [];
+    _azLogSid = job.sid;
+  }
+
+  const entries = parseAmazonLog(job);
+
+  // Eğer log yoksa job bilgilerinden özet satır üret
+  let lines = entries.length > 0 ? entries : buildSyntheticLog(job);
+
+  panel.classList.add('visible');
+
+  const isActive = job.status === 'PENDING' || job.status === 'IN_PROGRESS';
+  dot.className = 'az-log-dot' + (isActive ? '' : ' idle');
+
+  // Scroll pozisyonunu koru (alttaysa takip et)
+  const isAtBottom = body.scrollHeight - body.scrollTop <= body.clientHeight + 40;
+
+  body.innerHTML = lines.map(line => {
+    const text = typeof line === 'string' ? line : (line.msg || line.message || JSON.stringify(line));
+    const ts   = typeof line === 'object' && line.ts ? `<span class="log-ts">${new Date(line.ts).toLocaleTimeString('tr-TR')}</span>` : '';
+    let cls = 'log-txt';
+    if (text.includes('✅') || text.includes('COMPLETED') || text.includes('Tamamlandı')) cls += ' ok';
+    else if (text.includes('❌') || text.includes('FAILED') || text.includes('Hata') || text.includes('hata')) cls += ' err';
+    else if (text.includes('⚠') || text.includes('retry') || text.includes('Yanlis')) cls += ' warn';
+    return `<div class="log-line">${ts}<span class="${cls}">${escHtml(text)}</span></div>`;
+  }).join('');
+
+  if (isAtBottom) body.scrollTop = body.scrollHeight;
+}
+
+function buildSyntheticLog(job) {
+  const lines = [];
+  const s = job.status || '';
+  if (job.startedAt) lines.push(`[AmazonAutoOrder] Başlatılıyor: ${job.sid} ${job.whName||''} ${job.orderCode||''}`);
+  if (s === 'PENDING')     lines.push(`[AmazonAutoOrder] Durum: Bekliyor — Chrome eklentisi alacak`);
+  if (s === 'IN_PROGRESS') lines.push(`[AmazonAutoOrder] Durum: İşleniyor...`);
+  if (s === 'FAILED')      lines.push(`[AmazonAutoOrder] ❌ BAŞARISIZ${job.error ? ': '+job.error : ''}`);
+  if (s === 'COMPLETED' || job.bid) {
+    if (job.bid)   lines.push(`[AmazonAutoOrder] ✅ ${job.bid} / ${job.amount ? '$'+job.amount : ''}`);
+    else           lines.push(`[AmazonAutoOrder] ✅ Tamamlandı`);
+  }
+  return lines;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
@@ -1286,6 +1435,7 @@ function renderAmazonStatus(job) {
     det.textContent = 'Sistem Beklemede — Aktif iş bulunmuyor.';
     badge.className = 'az-badge idle';
     badge.textContent = 'IDLE';
+    renderAmazonLog(null);
     return;
   }
   const s = job.status || '';
@@ -1306,6 +1456,8 @@ function renderAmazonStatus(job) {
     badge.className = 'az-badge idle';
     badge.textContent = s || 'IDLE';
   }
+
+  renderAmazonLog(job);
 }
 
 function renderStores(storeNames) {
@@ -1380,6 +1532,9 @@ function renderOrders() {
     const state = getOrderState(order);
     const tr = document.createElement('tr');
 
+    // İşlem bekliyorsa satırı soluk göster
+    const isPending = _pendingOps.has(order.sid);
+
     let bestPrice = null, bestWh = null;
     if (order.prices) {
       for (const [wh, p] of Object.entries(order.prices)) {
@@ -1397,13 +1552,12 @@ function renderOrders() {
       : '—';
 
     if (isMobile) {
-      // Mobile card layout
       tr.innerHTML = `
         <td colspan="9" style="padding:0">
-          <div style="padding:14px 16px" onclick="openModal(${JSON.stringify(order).replace(/"/g,'&quot;')})">
+          <div style="padding:14px 16px;opacity:${isPending?'0.55':'1'};transition:opacity .3s" onclick="openModal(${JSON.stringify(order).replace(/"/g,'&quot;')})">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px;gap:8px">
               <span class="sid-cell">${order.sid||'—'}</span>
-              <span class="state-badge ${stateCls(state)}">${stateLabel(state)}</span>
+              <span class="state-badge ${stateCls(state)}">${isPending ? '⏳' : stateLabel(state)}</span>
             </div>
             <div class="product-cell" style="max-width:100%;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.4;margin-bottom:10px;color:var(--text2)">${order.productTitle||'—'}</div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -1417,11 +1571,12 @@ function renderOrders() {
         </td>`;
     } else {
       tr.onclick = () => openModal(order);
+      if (isPending) tr.style.opacity = '0.55';
       tr.innerHTML = `
         <td class="sid-cell">${order.sid||'—'}</td>
         <td class="product-cell" title="${order.productTitle||''}">${order.productTitle||'—'}</td>
         <td class="asin-cell">${order.asin||'—'}</td>
-        <td><span class="state-badge ${stateCls(state)}">${stateLabel(state)}</span></td>
+        <td><span class="state-badge ${stateCls(state)}">${isPending ? '⏳ İşleniyor' : stateLabel(state)}</span></td>
         <td class="price-cell">${priceHtml}</td>
         <td class="wh-cell">${order.whName ? `${order.whName}<br><span style="font-family:var(--mono);color:var(--text);font-size:11px">${order.orderCode||''}</span>` : '—'}</td>
         <td class="bid-cell">${order.bid ? `<a href="https://amazon.com/gp/css/order-details?orderID=${order.bid}" target="_blank" onclick="event.stopPropagation()">${order.bid.slice(-8)}</a>` : '—'}</td>
@@ -1435,6 +1590,8 @@ function renderOrders() {
 function buildActions(order, state) {
   const sid = order.sid, mktId = order.mktId;
   const oe = JSON.stringify(order).replace(/"/g,'&quot;');
+  const isPending = _pendingOps.has(sid);
+  if (isPending) return `<span style="color:var(--orange);font-size:12px;font-family:var(--mono)">⏳ İşleniyor...</span>`;
   let html = '';
   if (state === 'new') {
     html += `<button class="act-btn btn-price" onclick="doPrice(event,'${sid}','${mktId}')">💰 Fiyat Al</button>`;
@@ -1575,58 +1732,107 @@ document.getElementById('modal-overlay').onclick = e => {
 };
 
 // ─── ACTIONS ─────────────────────────────────────────────────────────────────
-async function doPrice(event, sid, mktId) {
-  if (event?.currentTarget) {
-    const btn = event.currentTarget;
-    btn.innerHTML = '⏳'; btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none';
+
+// Bekleyip tekrar fetch ederek işlemin tamamlandığını doğrula
+async function waitForStateChange(sid, mktId, expectedStateFn, maxWaitMs = 30000) {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    await new Promise(r => setTimeout(r, 2500));
+    try {
+      const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
+      if (!raw) break;
+      const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
+      const order = pending[sid];
+      if (!order) break; // Silindiyse de bitti
+      if (expectedStateFn(order)) break; // İstenen duruma geçti
+    } catch(e) {}
   }
+}
+
+async function doPrice(event, sid, mktId) {
+  const btn = event?.currentTarget;
+  if (btn) { btn.innerHTML = '⏳'; btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; }
+
+  _pendingOps.add(sid);
+  renderOrders(); // hemen "işleniyor" göster
+
   showToast(`💰 Fiyat isteği: ${sid}`, 'success');
   try {
     const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
-    if (!raw) return;
+    if (!raw) { _pendingOps.delete(sid); renderOrders(); return; }
     const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
     if (pending[sid]) {
       pending[sid].adminPriceRequest = Date.now();
+      delete pending[sid].prices; // eski fiyatları temizle
       await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
-      setTimeout(refreshAll, 2000);
+
+      // Fiyatlar gelene kadar bekle (prices alanı dolana kadar)
+      await waitForStateChange(sid, mktId, (o) => !!o.prices, 60000);
     }
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
+
+  _pendingOps.delete(sid);
+  // Sayfayı sıfırlamadan taze veri çek
+  if (!_isRefreshing) {
+    _isRefreshing = true;
+    try { await fetchAllData(); } finally { _isRefreshing = false; }
+  }
 }
 
 async function doOrder(event, sid, mktId, whName) {
-  if (event?.currentTarget) {
-    const btn = event.currentTarget;
-    btn.innerHTML = '⏳'; btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none';
-  }
+  const btn = event?.currentTarget;
+  if (btn) { btn.innerHTML = '⏳'; btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; }
+
+  _pendingOps.add(sid);
+  renderOrders();
+
   showToast(`📦 ${whName} seçildi: ${sid}`, 'success');
   try {
     const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
-    if (!raw) return;
+    if (!raw) { _pendingOps.delete(sid); renderOrders(); return; }
     const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
     if (pending[sid]) {
       pending[sid].adminOrderRequest = { whName, requestedAt: Date.now() };
       await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
-      setTimeout(refreshAll, 2000);
+
+      // orderCode gelene kadar bekle
+      await waitForStateChange(sid, mktId, (o) => !!o.orderCode, 60000);
     }
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
+
+  _pendingOps.delete(sid);
+  if (!_isRefreshing) {
+    _isRefreshing = true;
+    try { await fetchAllData(); } finally { _isRefreshing = false; }
+  }
 }
 
 async function doAmazon(event, sid, mktId) {
   if (!confirm(`${sid} için Amazon siparişi başlatılsın mı?`)) return;
-  if (event?.currentTarget) {
-    const btn = event.currentTarget;
-    btn.innerHTML = '⏳'; btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none';
-  }
+  const btn = event?.currentTarget;
+  if (btn) { btn.innerHTML = '⏳'; btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; }
+
+  _pendingOps.add(sid);
+  renderOrders();
+
   try {
     const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
-    if (!raw) return;
+    if (!raw) { _pendingOps.delete(sid); renderOrders(); return; }
     const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
     const order = pending[sid];
-    if (!order) { showToast('Sipariş bulunamadı', 'error'); return; }
+    if (!order) { showToast('Sipariş bulunamadı', 'error'); _pendingOps.delete(sid); renderOrders(); return; }
     await sbPut('AMAZON_AUTO_ORDER', JSON.stringify({ status:'PENDING', sid, mktId, whName:order.whName, orderCode:order.orderCode, asin:order.asin, startedAt:Date.now() }));
     showToast('🛒 Amazon siparişi başlatıldı!', 'success');
-    setTimeout(refreshAll, 2000);
+
+    // Amazon işlemi tamamlanana kadar bekle (bid gelene veya COMPLETED/FAILED olana kadar)
+    await waitForStateChange(sid, mktId, (o) => !!o.bid || !!o.amazonDone, 120000);
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
+
+  _pendingOps.delete(sid);
+  if (!_isRefreshing) {
+    _isRefreshing = true;
+    try { await fetchAllData(); } finally { _isRefreshing = false; }
+  }
 }
 
 async function doCancelAmazon(event, sid, mktId) {
@@ -1639,7 +1845,7 @@ async function doCancelAmazon(event, sid, mktId) {
       if (pending[sid]) { delete pending[sid].amazonStarted; await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending)); }
     }
     showToast('Amazon siparişi iptal edildi', 'success');
-    setTimeout(refreshAll, 2000);
+    setTimeout(refreshAll, 1500);
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
 }
 
@@ -1688,11 +1894,9 @@ function showToast(msg, type='success') {
 }
 
 async function refreshAll() {
-  const btn = document.getElementById('refresh-btn');
-  btn.classList.add('spinning');
+  if (_isRefreshing) return; // Zaten yenileniyor, pas geç
   try { await fetchAllData(); }
   catch(e) { setConnState('error'); showToast('Bağlantı hatası: ' + e.message, 'error'); }
-  setTimeout(() => btn.classList.remove('spinning'), 500);
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
