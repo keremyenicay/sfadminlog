@@ -1175,8 +1175,8 @@ let _allOrders    = [];
 let _activeFilter = 'all';
 let _activeMkt    = null;
 let _autoRefresh  = null;
-let _isRefreshing = false;   // çift fetch engeli
-let _pendingOps   = new Set(); // hangi sid'ler işlem bekliyor
+let _isRefreshing = false;   
+let _pendingOps   = new Set(); 
 
 function loadConfig() {
   const saved = localStorage.getItem('sf_cfg');
@@ -1267,8 +1267,6 @@ function stateCls(state) {
 
 async function fetchAllData() {
   setConnState('loading');
-
-  // ÖNEMLİ: Mevcut listeyi sıfırlamıyoruz, geçici bir listeye topluyoruz
   const newOrders = [];
 
   const storeNames = {};
@@ -1286,7 +1284,7 @@ async function fetchAllData() {
       try {
         const rawDb = await sbGet(`DB_${mktId}`);
         if (rawDb) dbData = (typeof rawDb === 'object') ? rawDb : JSON.parse(rawDb);
-      } catch(e) { console.warn(`DB_${mktId} çekilemedi.`); }
+      } catch(e) {}
 
       let pendingUpdated = false;
 
@@ -1316,13 +1314,11 @@ async function fetchAllData() {
 
       if (pendingUpdated) {
         await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
-        console.log(`[Temizlik] ${mktId} için tamamlanan siparişler silindi.`);
       }
 
-    } catch(e) { console.error(`mktId ${mktId} fetch error:`, e); }
+    } catch(e) {}
   }
 
-  // Tek seferde değiştir → çift render yok
   _allOrders = newOrders;
 
   let azStatus = null;
@@ -1338,6 +1334,24 @@ async function fetchAllData() {
   renderOrders();
   updateTopStats();
   setConnState('ok');
+
+  refreshModalIfOpen(); // Arka plan yenilemesinden sonra modalı güncelle
+}
+
+function refreshModalIfOpen() {
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay.classList.contains('open')) {
+    const sidElem = document.getElementById('modal-sid');
+    if (sidElem) {
+      const currentSid = sidElem.textContent;
+      const updatedOrder = _allOrders.find(o => o.sid === currentSid);
+      if (updatedOrder) {
+        openModal(updatedOrder); 
+      } else {
+        closeModal(); 
+      }
+    }
+  }
 }
 
 // ─── AMAZON LOG ───────────────────────────────────────────────────────────────
@@ -1346,11 +1360,8 @@ let _azLogSid     = null;
 
 function parseAmazonLog(job) {
   if (!job) return [];
-  // Log array varsa direkt kullan
   if (Array.isArray(job.log)) return job.log;
-  // Alternatif: logs field
   if (Array.isArray(job.logs)) return job.logs;
-  // Tek string log
   if (typeof job.log === 'string' && job.log) return job.log.split('\n').filter(Boolean);
   return [];
 }
@@ -1367,15 +1378,12 @@ function renderAmazonLog(job) {
     return;
   }
 
-  // Yeni iş mi başladı?
   if (job.sid !== _azLogSid) {
     _azLogEntries = [];
     _azLogSid = job.sid;
   }
 
   const entries = parseAmazonLog(job);
-
-  // Eğer log yoksa job bilgilerinden özet satır üret
   let lines = entries.length > 0 ? entries : buildSyntheticLog(job);
 
   panel.classList.add('visible');
@@ -1383,7 +1391,6 @@ function renderAmazonLog(job) {
   const isActive = job.status === 'PENDING' || job.status === 'IN_PROGRESS';
   dot.className = 'az-log-dot' + (isActive ? '' : ' idle');
 
-  // Scroll pozisyonunu koru (alttaysa takip et)
   const isAtBottom = body.scrollHeight - body.scrollTop <= body.clientHeight + 40;
 
   body.innerHTML = lines.map(line => {
@@ -1526,7 +1533,6 @@ function renderOrders() {
     const state = getOrderState(order);
     const tr = document.createElement('tr');
 
-    // İşlem bekliyorsa satırı soluk göster
     const isPending = _pendingOps.has(order.sid);
 
     let bestPrice = null, bestWh = null;
@@ -1583,7 +1589,6 @@ function renderOrders() {
 
 function buildActions(order, state) {
   const sid = order.sid, mktId = order.mktId;
-  const oe = JSON.stringify(order).replace(/"/g,'&quot;');
   const isPending = _pendingOps.has(sid);
   if (isPending) return `<span style="color:var(--orange);font-size:12px;font-family:var(--mono)">⏳ İşleniyor...</span>`;
   let html = '';
@@ -1592,7 +1597,7 @@ function buildActions(order, state) {
     html += `<button class="act-btn btn-skip"  onclick="doSkip('${sid}','${mktId}')">✕ Atla</button>`;
   }
   if (state === 'priced') {
-    html += `<button class="act-btn btn-order" onclick="openModal(${oe})">📦 Depo Seç</button>`;
+    html += `<button class="act-btn btn-order" onclick="openModal(${JSON.stringify(order).replace(/"/g,'&quot;')})">📦 Depo Seç</button>`;
     html += `<button class="act-btn btn-price" onclick="doPrice(event,'${sid}','${mktId}')">🔄</button>`;
   }
   if (state === 'ordered') {
@@ -1624,6 +1629,8 @@ function setFilter(f, btn) {
 // ─── MODAL ────────────────────────────────────────────────────────────────────
 function openModal(order) {
   const state = getOrderState(order);
+  const isPending = _pendingOps.has(order.sid);
+  
   document.getElementById('modal-title').textContent = order.productTitle || order.sid || 'Sipariş Detayı';
   document.getElementById('modal-sid').textContent = order.sid || '';
 
@@ -1703,16 +1710,18 @@ function openModal(order) {
     </div>
     ${pricesHtml}
     <div class="modal-actions">
-      ${state==='new' ? `<button class="act-btn btn-price" onclick="doPrice(event,'${order.sid}','${order.mktId}');closeModal()">💰 Fiyat Al</button>` : ''}
-      ${state==='priced' ? `
-        <button class="act-btn btn-order" onclick="doOrder(event,'${order.sid}','${order.mktId}','PREPLARGE');closeModal()">📦 PREPLARGE</button>
-        <button class="act-btn btn-order" onclick="doOrder(event,'${order.sid}','${order.mktId}','COMFYSHIP');closeModal()">📦 COMFYSHIP</button>
-        <button class="act-btn btn-order" onclick="doOrder(event,'${order.sid}','${order.mktId}','FULLFILLONUS');closeModal()">📦 FULLFILL</button>
-        <button class="act-btn btn-order" onclick="doOrder(event,'${order.sid}','${order.mktId}','SF');closeModal()">📦 SHIPPLNG</button>
-      ` : ''}
-      ${state==='ordered' ? `<button class="act-btn btn-amazon" onclick="doAmazon(event,'${order.sid}','${order.mktId}');closeModal()">🛒 Amazon'a Geç</button>` : ''}
-      ${state==='amazon' ? `<button class="act-btn btn-cancel" onclick="doCancelAmazon(event,'${order.sid}','${order.mktId}');closeModal()">🛑 İptal Et</button>` : ''}
-      ${!['done','skipped'].includes(state) ? `<button class="act-btn btn-skip" onclick="doSkip('${order.sid}','${order.mktId}');closeModal()">✕ Atla</button>` : ''}
+      ${isPending ? `<div style="width:100%;text-align:center;padding:12px;color:var(--orange);font-weight:bold;font-family:var(--mono);">⏳ İşlem Devam Ediyor... Lütfen Bekleyin.</div>` : `
+        ${state==='new' ? `<button class="act-btn btn-price" onclick="doPrice(event,'${order.sid}','${order.mktId}')">💰 Fiyat Al</button>` : ''}
+        ${state==='priced' ? `
+          <button class="act-btn btn-order" onclick="doOrder(event,'${order.sid}','${order.mktId}','PREPLARGE')">📦 PREPLARGE</button>
+          <button class="act-btn btn-order" onclick="doOrder(event,'${order.sid}','${order.mktId}','COMFYSHIP')">📦 COMFYSHIP</button>
+          <button class="act-btn btn-order" onclick="doOrder(event,'${order.sid}','${order.mktId}','FULLFILLONUS')">📦 FULLFILL</button>
+          <button class="act-btn btn-order" onclick="doOrder(event,'${order.sid}','${order.mktId}','SF')">📦 SHIPPLNG</button>
+        ` : ''}
+        ${state==='ordered' ? `<button class="act-btn btn-amazon" onclick="doAmazon(event,'${order.sid}','${order.mktId}')">🛒 Amazon'a Geç</button>` : ''}
+        ${state==='amazon' ? `<button class="act-btn btn-cancel" onclick="doCancelAmazon(event,'${order.sid}','${order.mktId}')">🛑 İptal Et</button>` : ''}
+        ${!['done','skipped'].includes(state) ? `<button class="act-btn btn-skip" onclick="doSkip('${order.sid}','${order.mktId}')">✕ Atla</button>` : ''}
+      `}
     </div>`;
 
   document.getElementById('modal-overlay').classList.add('open');
@@ -1727,7 +1736,6 @@ document.getElementById('modal-overlay').onclick = e => {
 
 // ─── ACTIONS ─────────────────────────────────────────────────────────────────
 
-// Bekleyip tekrar fetch ederek işlemin tamamlandığını doğrula
 async function waitForStateChange(sid, mktId, expectedStateFn, maxWaitMs = 30000) {
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
@@ -1737,30 +1745,27 @@ async function waitForStateChange(sid, mktId, expectedStateFn, maxWaitMs = 30000
       if (!raw) break;
       const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
       const order = pending[sid];
-      if (!order) break; // Silindiyse de bitti
-      if (expectedStateFn(order)) break; // İstenen duruma geçti
+      if (!order) break; 
+      if (expectedStateFn(order)) break; 
     } catch(e) {}
   }
 }
 
 async function doPrice(event, sid, mktId) {
-  const btn = event?.currentTarget;
-  if (btn) { btn.innerHTML = '⏳'; btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; }
-
   _pendingOps.add(sid);
-  renderOrders(); // hemen "işleniyor" göster
+  renderOrders();
+  refreshModalIfOpen();
 
   showToast(`💰 Fiyat isteği: ${sid}`, 'success');
   try {
     const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
-    if (!raw) { _pendingOps.delete(sid); renderOrders(); return; }
+    if (!raw) { _pendingOps.delete(sid); renderOrders(); refreshModalIfOpen(); return; }
     const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
     if (pending[sid]) {
       pending[sid].adminPriceRequest = Date.now();
-      delete pending[sid].prices; // eski fiyatları temizle
+      delete pending[sid].prices; 
       await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
 
-      // Fiyatlar gelene kadar bekle (prices alanı dolana kadar)
       await waitForStateChange(sid, mktId, (o) => !!o.prices, 60000);
     }
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
@@ -1770,22 +1775,19 @@ async function doPrice(event, sid, mktId) {
 }
 
 async function doOrder(event, sid, mktId, whName) {
-  const btn = event?.currentTarget;
-  if (btn) { btn.innerHTML = '⏳'; btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; }
-
   _pendingOps.add(sid);
   renderOrders();
+  refreshModalIfOpen();
 
   showToast(`📦 ${whName} seçildi: ${sid}`, 'success');
   try {
     const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
-    if (!raw) { _pendingOps.delete(sid); renderOrders(); return; }
+    if (!raw) { _pendingOps.delete(sid); renderOrders(); refreshModalIfOpen(); return; }
     const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
     if (pending[sid]) {
       pending[sid].adminOrderRequest = { whName, requestedAt: Date.now() };
       await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
 
-      // orderCode gelene kadar bekle
       await waitForStateChange(sid, mktId, (o) => !!o.orderCode, 60000);
     }
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
@@ -1796,22 +1798,21 @@ async function doOrder(event, sid, mktId, whName) {
 
 async function doAmazon(event, sid, mktId) {
   if (!confirm(`${sid} için Amazon siparişi başlatılsın mı?`)) return;
-  const btn = event?.currentTarget;
-  if (btn) { btn.innerHTML = '⏳'; btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; }
-
+  
   _pendingOps.add(sid);
   renderOrders();
+  refreshModalIfOpen();
 
   try {
     const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
-    if (!raw) { _pendingOps.delete(sid); renderOrders(); return; }
+    if (!raw) { _pendingOps.delete(sid); renderOrders(); refreshModalIfOpen(); return; }
     const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
     const order = pending[sid];
-    if (!order) { showToast('Sipariş bulunamadı', 'error'); _pendingOps.delete(sid); renderOrders(); return; }
+    if (!order) { showToast('Sipariş bulunamadı', 'error'); _pendingOps.delete(sid); renderOrders(); refreshModalIfOpen(); return; }
+    
     await sbPut('AMAZON_AUTO_ORDER', JSON.stringify({ status:'PENDING', sid, mktId, whName:order.whName, orderCode:order.orderCode, asin:order.asin, startedAt:Date.now() }));
     showToast('🛒 Amazon siparişi başlatıldı!', 'success');
 
-    // Amazon işlemi tamamlanana kadar bekle (bid gelene veya COMPLETED/FAILED olana kadar)
     await waitForStateChange(sid, mktId, (o) => !!o.bid || !!o.amazonDone, 120000);
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
 
@@ -1821,6 +1822,11 @@ async function doAmazon(event, sid, mktId) {
 
 async function doCancelAmazon(event, sid, mktId) {
   if (!confirm('Amazon siparişi iptal edilsin mi?')) return;
+  
+  _pendingOps.add(sid);
+  renderOrders();
+  refreshModalIfOpen();
+
   try {
     await sbPut('AMAZON_AUTO_ORDER', '');
     const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
@@ -1829,23 +1835,32 @@ async function doCancelAmazon(event, sid, mktId) {
       if (pending[sid]) { delete pending[sid].amazonStarted; await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending)); }
     }
     showToast('Amazon siparişi iptal edildi', 'success');
-    setTimeout(refreshAll, 1500);
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
+
+  _pendingOps.delete(sid);
+  await refreshAll();
 }
 
 async function doSkip(sid, mktId) {
   if (!confirm(`${sid} atlanacak, emin misiniz?`)) return;
+  
+  _pendingOps.add(sid);
+  renderOrders();
+  refreshModalIfOpen();
+
   try {
     const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
-    if (!raw) return;
+    if (!raw) { _pendingOps.delete(sid); renderOrders(); refreshModalIfOpen(); return; }
     const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
     if (pending[sid]) {
       pending[sid].skipped = true;
       await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
       showToast('Sipariş atlandı', 'success');
-      setTimeout(refreshAll, 1500);
     }
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
+  
+  _pendingOps.delete(sid);
+  await refreshAll();
 }
 
 // ─── UTIL ─────────────────────────────────────────────────────────────────────
@@ -1878,7 +1893,7 @@ function showToast(msg, type='success') {
 }
 
 async function refreshAll() {
-  if (_isRefreshing) return; // Zaten çalışıyor, pas geç
+  if (_isRefreshing) return; 
   _isRefreshing = true;
   try {
     await fetchAllData();
@@ -1906,7 +1921,6 @@ if (loadConfig() && CFG.url && CFG.key) {
   setConnState('error');
 }
 
-// Re-render on orientation change
 window.addEventListener('resize', () => renderOrders());
 </script>
 </body>
