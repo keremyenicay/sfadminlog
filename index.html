@@ -1707,6 +1707,11 @@ function openModal(order) {
         <div class="detail-key">Tespit Zamanı</div>
         <div class="detail-val" style="font-size:12px">${detects}</div>
       </div>
+      ${order.whOrderError ? `
+      <div class="detail-item full" style="grid-column:1/-1">
+        <div class="detail-key" style="color:var(--red)">⚠️ Depo Sipariş Hatası</div>
+        <div class="detail-val" style="color:var(--red);font-size:12px;word-break:break-word">${escHtml(order.whOrderError)}</div>
+      </div>` : ''}
     </div>
     ${pricesHtml}
     <div class="modal-actions">
@@ -1810,7 +1815,18 @@ async function doAmazon(event, sid, mktId) {
     const order = pending[sid];
     if (!order) { showToast('Sipariş bulunamadı', 'error'); _pendingOps.delete(sid); renderOrders(); refreshModalIfOpen(); return; }
     
-    await sbPut('AMAZON_AUTO_ORDER', JSON.stringify({ status:'PENDING', sid, mktId, whName:order.whName, orderCode:order.orderCode, asin:order.asin, startedAt:Date.now() }));
+    // products array varsa kullan (çoklu ASIN / adet desteği), yoksa asin'den oluştur
+    const jobProducts = Array.isArray(order.products) && order.products.length > 0
+      ? order.products
+      : (order.asin ? [{ asin: order.asin, qty: order.qty || 1 }] : []);
+    await sbPut('AMAZON_AUTO_ORDER', JSON.stringify({
+      status: 'PENDING', sid, mktId,
+      whName: order.whName, orderCode: order.orderCode,
+      asin: order.asin,          // geriye dönük uyumluluk
+      qty: order.qty || 1,       // geriye dönük uyumluluk
+      products: jobProducts,     // çoklu ASIN / adet desteği
+      startedAt: Date.now()
+    }));
     showToast('🛒 Amazon siparişi başlatıldı!', 'success');
 
     await waitForStateChange(sid, mktId, (o) => !!o.bid || !!o.amazonDone, 120000);
