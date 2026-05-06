@@ -284,7 +284,7 @@ body::before {
    AMAZON LOG TERMINAL
 ══════════════════════════════════════ */
 #amazon-log-panel {
-  background: #0f172a; /* Terminali koyu tutuyoruz (Pro hissi için) */
+  background: #0f172a; 
   border: 1px solid var(--border2);
   border-radius: var(--radius); margin-bottom: 20px;
   overflow: hidden; display: none;
@@ -369,11 +369,6 @@ body::before {
   gap: 16px; margin-bottom: 24px;
 }
 
-@media (max-width: 600px) {
-  #main { padding: 16px; }
-  #stores-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-}
-
 .store-card {
   background: var(--glass-bg); border: 1px solid #ffffff;
   border-radius: var(--radius); padding: 20px; cursor: pointer;
@@ -401,7 +396,6 @@ body::before {
 .store-mkt {
   color: var(--text3); font-size: 12px; font-family: var(--mono); margin-bottom: 18px;
 }
-@media (max-width: 600px) { .store-mkt { margin-bottom: 12px; } }
 
 .store-counts { display: flex; gap: 10px; }
 .sc {
@@ -412,7 +406,6 @@ body::before {
   font-size: 22px; font-weight: 800; line-height: 1;
   margin-bottom: 6px; letter-spacing: -0.5px;
 }
-@media (max-width: 600px) { .sc-num { font-size: 18px; } .sc { padding: 10px 4px; } }
 .sc-num.orange { color: var(--sf-orange); }
 .sc-num.blue   { color: var(--seller-blue); }
 .sc-num.green  { color: var(--seller-green); }
@@ -543,14 +536,43 @@ td { padding: 16px 24px; vertical-align: middle; }
 .btn-cancel:hover { background: rgba(225,29,72,.15); }
 .btn-skip:hover   { background: var(--bg4); }
 
+
 /* ══════════════════════════════════════
-   MOBILE CARD VIEW
+   MOBILE VIEW FIXES (TAMAMEN YENİLENDİ)
 ══════════════════════════════════════ */
 @media (max-width: 768px) {
+  /* Üst Menü (Topbar) sıkışmasını önleme */
+  #topbar { 
+    padding: 0 12px; 
+    gap: 8px; 
+    height: calc(64px + var(--safe-top)); 
+  }
+  .logo-icon { width: 34px; height: 34px; font-size: 14px; }
+  .logo-text { font-size: 15px; }
+  .conn-pill { padding: 6px 10px; font-size: 11px; }
+  .icon-btn, .refresh-btn { width: 36px; height: 36px; }
+  #topbar-right { gap: 8px; }
+
+  /* Ana içerik padding'lerini daraltma */
+  #main { padding: 16px 12px; }
+  
+  /* Mağaza Kartları taşımasını önleme */
+  #stores-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .store-card { padding: 14px 12px; }
+  .store-name { font-size: 14px; }
+  .store-mkt { margin-bottom: 10px; }
+  
+  /* TOPLAM, YENİ gibi yazıların taşmasını engelleme */
+  .store-counts { gap: 4px; }
+  .sc { padding: 8px 2px; }
+  .sc-num { font-size: 15px; margin-bottom: 2px; }
+  .sc-label { font-size: 9px; letter-spacing: 0; }
+
+  /* Siparişler Tablosu -> Kart Görünümü (Sabit Kaldı) */
   thead { display: none; }
   #orders-table-wrap { overflow: visible; background: transparent; }
   table { display: block; }
-  tbody { display: flex; flex-direction: column; gap: 12px; padding: 12px; background: transparent; }
+  tbody { display: flex; flex-direction: column; gap: 12px; padding: 12px 0; background: transparent; }
   
   tbody tr {
     display: flex; flex-direction: column; gap: 0;
@@ -577,6 +599,12 @@ td { padding: 16px 24px; vertical-align: middle; }
   .act-btn { padding: 10px 14px; font-size: 13px; flex: 1; min-width: 0; text-align: center; justify-content: center; }
   .price-cell { margin-bottom: 8px; }
 }
+
+@media (max-width: 380px) {
+  /* Çok dar ekranlar için (Eski iPhone'lar vs.) ekstra alan açma */
+  .logo-text { display: none; } /* Sadece ikon kalsın */
+}
+
 
 /* ══════════════════════════════════════
    DETAIL MODAL
@@ -866,7 +894,6 @@ td { padding: 16px 24px; vertical-align: middle; }
 <!-- TOAST -->
 <div id="toast"></div>
 
-<!-- JavaScript Aynen Korunmuştur -->
 <script>
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 let CFG = { url: '', key: '', mkts: ['78524', '87709'] };
