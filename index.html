@@ -1709,7 +1709,10 @@ function openModal(order) {
       </div>
       ${order.whOrderError ? `
       <div class="detail-item full" style="grid-column:1/-1">
-        <div class="detail-key" style="color:var(--red)">⚠️ Depo Sipariş Hatası</div>
+        <div class="detail-key" style="color:var(--red);display:flex;align-items:center;justify-content:space-between">
+          <span>⚠️ Depo Sipariş Hatası</span>
+          <button onclick="clearWhError('${order.sid}','${order.mktId}')" style="font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--red);background:transparent;color:var(--red);cursor:pointer">✕ Temizle</button>
+        </div>
         <div class="detail-val" style="color:var(--red);font-size:12px;word-break:break-word">${escHtml(order.whOrderError)}</div>
       </div>` : ''}
     </div>
@@ -1855,6 +1858,21 @@ async function doCancelAmazon(event, sid, mktId) {
 
   _pendingOps.delete(sid);
   await refreshAll();
+}
+
+async function clearWhError(sid, mktId) {
+  try {
+    const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
+    if (!raw) return;
+    const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
+    if (pending[sid]) {
+      delete pending[sid].whOrderError;
+      delete pending[sid].whOrderErrorAt;
+      await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
+      showToast('Hata temizlendi', 'success');
+      await refreshAll();
+    }
+  } catch(e) { showToast('Hata: ' + e.message, 'error'); }
 }
 
 async function doSkip(sid, mktId) {
