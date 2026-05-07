@@ -1016,7 +1016,23 @@ async function fetchAllData() {
       let pendingUpdated = false;
 
       for (const [sid, order] of Object.entries(pending)) {
+        // buyerOrderId varsa tamamlanmış — sil
         if (dbData[sid] && dbData[sid].buyerOrderId) {
+          delete pending[sid];
+          pendingUpdated = true;
+          continue;
+        }
+
+        // Eski sistemden kalma skipped:true olanları temizle
+        if (order.skipped) {
+          delete pending[sid];
+          pendingUpdated = true;
+          continue;
+        }
+
+        // SF'de iptal/iade olmuşsa — sil (sfStatus 2=cancelled, 3=returned, 4=refunded)
+        const sfStatus = dbData[sid]?.sfStatus ?? dbData[sid]?.status ?? null;
+        if (sfStatus !== null && [2, 3, 4, '2', '3', '4', 'cancelled', 'Cancelled', 'CANCELLED'].includes(sfStatus)) {
           delete pending[sid];
           pendingUpdated = true;
           continue;
@@ -1356,7 +1372,6 @@ function buildActions(order, state) {
   let html = '';
   if (state === 'new') {
     html += `<button class="act-btn btn-price" onclick="doPrice(event,'${sid}','${mktId}')">💰 Fiyat Al</button>`;
-    html += `<button class="act-btn btn-skip"  onclick="doSkip('${sid}','${mktId}')">✕ Atla</button>`;
   }
   if (state === 'priced') {
     html += `<button class="act-btn btn-order" onclick="openModal(${JSON.stringify(order).replace(/"/g,'&quot;')})">📦 Depo Seç</button>`;
@@ -1372,6 +1387,9 @@ function buildActions(order, state) {
   }
   if (state === 'amazon') {
     html += `<button class="act-btn btn-cancel" onclick="doCancelAmazon(event,'${sid}','${mktId}')">🛑 İptal</button>`;
+  }
+  if (!['done'].includes(state)) {
+    html += `<button class="act-btn btn-skip" onclick="doDelete('${sid}','${mktId}')" style="background:rgba(225,29,72,0.1);color:var(--red);border-color:rgba(225,29,72,0.25)">🗑️</button>`;
   }
   return html || '<span style="color:var(--text3);font-size:12px">—</span>';
 }
@@ -1502,7 +1520,7 @@ function openModal(order) {
           return `<button class="act-btn btn-amazon" onclick="doAmazon(event,'${order.sid}','${order.mktId}')">🛒 Amazon'a Geç</button>`;
         })() : ''}
         ${state==='amazon' ? `<button class="act-btn btn-cancel" onclick="doCancelAmazon(event,'${order.sid}','${order.mktId}')">🛑 İptal Et</button>` : ''}
-        ${!['done','skipped'].includes(state) ? `<button class="act-btn btn-skip" onclick="doSkip('${order.sid}','${order.mktId}')">✕ Atla</button>` : ''}
+        ${!['done'].includes(state) ? `<button class="act-btn btn-skip" onclick="doDelete('${order.sid}','${order.mktId}')" style="background:rgba(225,29,72,0.1);color:var(--red);border-color:rgba(225,29,72,0.25);margin-top:4px">🗑️ Panelden Sil</button>` : ''}
       `}
     </div>`;
 
@@ -1691,8 +1709,8 @@ async function clearWhError(sid, mktId) {
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
 }
 
-async function doSkip(sid, mktId) {
-  if (!confirm(`${sid} atlanacak, emin misiniz?`)) return;
+async function doDelete(sid, mktId) {
+  if (!confirm(`${sid} panelden komple silinsin mi?`)) return;
   
   _pendingOps.add(sid);
   renderOrders();
@@ -1703,14 +1721,32 @@ async function doSkip(sid, mktId) {
     if (!raw) { _pendingOps.delete(sid); renderOrders(); refreshModalIfOpen(); return; }
     const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
     if (pending[sid]) {
-      pending[sid].skipped = true;
+      delete pending[sid];
       await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
-      showToast('Sipariş atlandı', 'success');
+      showToast('🗑️ Sipariş silindi', 'success');
     }
+    // Queue'dan da temizle
+    try {
+      const qRaw = await sbGet('AMAZON_AUTO_ORDER_QUEUE');
+      if (qRaw && qRaw !== '') {
+        const queue = typeof qRaw === 'object' ? qRaw : JSON.parse(qRaw);
+        const filtered = queue.filter(j => j.sid !== sid);
+        if (filtered.length !== queue.length) {
+          await sbPut('AMAZON_AUTO_ORDER_QUEUE', JSON.stringify(filtered));
+          _amazonQueue = filtered;
+        }
+      }
+    } catch(_) {}
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
   
   _pendingOps.delete(sid);
+  closeModal();
   await refreshAll();
+}
+
+async function doSkip(sid, mktId) {
+  // doSkip artık doDelete'i çağırır
+  return doDelete(sid, mktId);
 }
 
 // ─── UTIL ─────────────────────────────────────────────────────────────────────
