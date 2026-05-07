@@ -902,7 +902,8 @@ let _activeFilter = 'all';
 let _activeMkt    = null;
 let _autoRefresh  = null;
 let _isRefreshing = false;   
-let _pendingOps   = new Set(); 
+let _pendingOps   = new Set();
+let _amazonQueue  = []; // Queue'daki işler (sıra numarası gösterimi için)
 
 function loadConfig() {
   const saved = localStorage.getItem('sf_cfg');
@@ -1055,6 +1056,16 @@ async function fetchAllData() {
     }
   } catch(e) {}
 
+  // ─── Queue'yu da çek ───────────────────────────────────────────────────────
+  try {
+    const qRaw = await sbGet('AMAZON_AUTO_ORDER_QUEUE');
+    if (qRaw && qRaw !== '' && qRaw !== 'null') {
+      _amazonQueue = typeof qRaw === 'object' ? qRaw : JSON.parse(qRaw);
+    } else {
+      _amazonQueue = [];
+    }
+  } catch(e) { _amazonQueue = []; }
+
   renderAmazonStatus(azStatus);
   renderStores(storeNames);
   renderOrders();
@@ -1163,28 +1174,48 @@ function renderAmazonStatus(job) {
     badge.className = 'az-badge idle';
     badge.textContent = 'IDLE';
     renderAmazonLog(null);
-    return;
-  }
-  const s = job.status || '';
-  const txt = `${job.sid || ''} → ${job.whName || ''} ${job.orderCode || ''} ${job.asin ? '('+job.asin+')' : ''}`.trim();
-  det.textContent = txt || '—';
-
-  if (s === 'PENDING' || s === 'IN_PROGRESS') {
-    el.classList.add('in-progress');
-    badge.className = 'az-badge progress';
-    badge.textContent = s === 'IN_PROGRESS' ? 'ÇALIŞIYOR' : 'BEKLİYOR';
-  } else if (s === 'FAILED') {
-    el.classList.add('failed');
-    badge.className = 'az-badge failed';
-    badge.textContent = 'BAŞARISIZ';
-    if (job.error) det.textContent += ' — ' + job.error.slice(0,80);
   } else {
-    el.classList.add('idle');
-    badge.className = 'az-badge idle';
-    badge.textContent = s || 'IDLE';
+    const s = job.status || '';
+    const txt = `${job.sid || ''} → ${job.whName || ''} ${job.orderCode || ''} ${job.asin ? '('+job.asin+')' : ''}`.trim();
+    det.textContent = txt || '—';
+
+    if (s === 'PENDING' || s === 'IN_PROGRESS') {
+      el.classList.add('in-progress');
+      badge.className = 'az-badge progress';
+      badge.textContent = s === 'IN_PROGRESS' ? 'ÇALIŞIYOR' : 'BEKLİYOR';
+    } else if (s === 'FAILED') {
+      el.classList.add('failed');
+      badge.className = 'az-badge failed';
+      badge.textContent = 'BAŞARISIZ';
+      if (job.error) det.textContent += ' — ' + job.error.slice(0,80);
+    } else {
+      el.classList.add('idle');
+      badge.className = 'az-badge idle';
+      badge.textContent = s || 'IDLE';
+    }
+    renderAmazonLog(job);
   }
 
-  renderAmazonLog(job);
+  // ─── Queue Paneli ─────────────────────────────────────────────────────────
+  let queuePanel = document.getElementById('amazon-queue-panel');
+  if (!queuePanel) {
+    queuePanel = document.createElement('div');
+    queuePanel.id = 'amazon-queue-panel';
+    queuePanel.style.cssText = 'margin-top:10px;padding:10px 14px;background:rgba(255,123,0,0.07);border:1px solid rgba(255,123,0,0.2);border-radius:12px;font-size:13px;display:none';
+    el.parentNode.insertBefore(queuePanel, el.nextSibling);
+  }
+  if (_amazonQueue && _amazonQueue.length > 0) {
+    queuePanel.style.display = 'block';
+    queuePanel.innerHTML = `<div style="font-weight:700;color:var(--sf-orange);margin-bottom:8px">🕒 Amazon Sırası (${_amazonQueue.length} bekliyor)</div>`
+      + _amazonQueue.map((j, i) => `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,123,0,0.1)">
+        <span style="font-weight:700;color:var(--sf-orange);font-family:var(--mono);min-width:22px">#${i+1}</span>
+        <span style="font-family:var(--mono);font-size:12px;color:var(--text2);flex:1">${j.sid}</span>
+        <span style="font-size:11px;color:var(--text3)">${j.whName||''}</span>
+        <button onclick="doCancelQueue('${j.sid}','${j.mktId}')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid rgba(225,29,72,0.3);background:rgba(225,29,72,0.08);color:var(--red);cursor:pointer;font-weight:700">✕</button>
+      </div>`).join('');
+  } else {
+    queuePanel.style.display = 'none';
+  }
 }
 
 function renderStores(storeNames) {
@@ -1317,6 +1348,11 @@ function buildActions(order, state) {
   const sid = order.sid, mktId = order.mktId;
   const isPending = _pendingOps.has(sid);
   if (isPending) return `<span style="color:var(--sf-orange);font-size:12px;font-weight:700;font-family:var(--mono)">⏳ İşleniyor...</span>`;
+
+  // Bu sipariş queue'da mı?
+  const queueIdx = _amazonQueue ? _amazonQueue.findIndex(j => j.sid === sid) : -1;
+  const isQueued = queueIdx >= 0;
+
   let html = '';
   if (state === 'new') {
     html += `<button class="act-btn btn-price" onclick="doPrice(event,'${sid}','${mktId}')">💰 Fiyat Al</button>`;
@@ -1327,7 +1363,12 @@ function buildActions(order, state) {
     html += `<button class="act-btn btn-price" onclick="doPrice(event,'${sid}','${mktId}')">🔄</button>`;
   }
   if (state === 'ordered') {
-    html += `<button class="act-btn btn-amazon" onclick="doAmazon(event,'${sid}','${mktId}')">🛒 Amazon</button>`;
+    if (isQueued) {
+      html += `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,123,0,0.12);border:1px solid rgba(255,123,0,0.3);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--sf-orange);font-family:var(--mono)">🕒 Sıra #${queueIdx + 1}</span>`;
+      html += `<button class="act-btn btn-cancel" onclick="doCancelQueue('${sid}','${mktId}')" style="font-size:11px">✕</button>`;
+    } else {
+      html += `<button class="act-btn btn-amazon" onclick="doAmazon(event,'${sid}','${mktId}')">🛒 Amazon</button>`;
+    }
   }
   if (state === 'amazon') {
     html += `<button class="act-btn btn-cancel" onclick="doCancelAmazon(event,'${sid}','${mktId}')">🛑 İptal</button>`;
@@ -1452,7 +1493,14 @@ function openModal(order) {
           <button class="act-btn btn-order" onclick="doOrder(event,'${order.sid}','${order.mktId}','FULLFILLONUS')">📦 FULLFILL</button>
           <button class="act-btn btn-order" onclick="doOrder(event,'${order.sid}','${order.mktId}','SF')">📦 SHIPPLNG</button>
         ` : ''}
-        ${state==='ordered' ? `<button class="act-btn btn-amazon" onclick="doAmazon(event,'${order.sid}','${order.mktId}')">🛒 Amazon'a Geç</button>` : ''}
+        ${state==='ordered' ? (() => {
+          const qIdx = _amazonQueue ? _amazonQueue.findIndex(j => j.sid === order.sid) : -1;
+          if (qIdx >= 0) {
+            return `<div style="padding:12px 16px;background:rgba(255,123,0,0.1);border:1px solid rgba(255,123,0,0.25);border-radius:12px;text-align:center;font-weight:700;color:var(--sf-orange)">🕒 Sıra #${qIdx + 1} — Bekleniyor</div>
+                    <button class="act-btn btn-cancel" onclick="doCancelQueue('${order.sid}','${order.mktId}')">✕ Sıradan Çıkar</button>`;
+          }
+          return `<button class="act-btn btn-amazon" onclick="doAmazon(event,'${order.sid}','${order.mktId}')">🛒 Amazon'a Geç</button>`;
+        })() : ''}
         ${state==='amazon' ? `<button class="act-btn btn-cancel" onclick="doCancelAmazon(event,'${order.sid}','${order.mktId}')">🛑 İptal Et</button>` : ''}
         ${!['done','skipped'].includes(state) ? `<button class="act-btn btn-skip" onclick="doSkip('${order.sid}','${order.mktId}')">✕ Atla</button>` : ''}
       `}
@@ -1531,8 +1579,27 @@ async function doOrder(event, sid, mktId, whName) {
 }
 
 async function doAmazon(event, sid, mktId) {
-  if (!confirm(`${sid} için Amazon siparişi başlatılsın mı?`)) return;
-  
+  // Queue'daki mevcut pozisyonu kontrol et
+  const currentQueue = await sbGet('AMAZON_AUTO_ORDER_QUEUE').catch(() => null);
+  const queue = currentQueue && currentQueue !== '' ? (typeof currentQueue === 'object' ? currentQueue : JSON.parse(currentQueue)) : [];
+
+  // Zaten sıradaysa tekrar ekleme
+  if (queue.find(j => j.sid === sid)) {
+    const pos = queue.findIndex(j => j.sid === sid) + 1;
+    showToast(`⚠️ ${sid} zaten sırada — #${pos}`, 'error');
+    return;
+  }
+
+  // Aktif işte de değilse queue'ya ekle
+  const azRaw = await sbGet('AMAZON_AUTO_ORDER').catch(() => null);
+  if (azRaw && azRaw !== '' && azRaw !== 'null') {
+    const active = typeof azRaw === 'object' ? azRaw : JSON.parse(azRaw);
+    if (active?.sid === sid && (active?.status === 'PENDING' || active?.status === 'IN_PROGRESS')) {
+      showToast(`⚠️ ${sid} zaten işleniyor`, 'error');
+      return;
+    }
+  }
+
   _pendingOps.add(sid);
   renderOrders();
   refreshModalIfOpen();
@@ -1543,25 +1610,49 @@ async function doAmazon(event, sid, mktId) {
     const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
     const order = pending[sid];
     if (!order) { showToast('Sipariş bulunamadı', 'error'); _pendingOps.delete(sid); renderOrders(); refreshModalIfOpen(); return; }
-    
+
     const jobProducts = Array.isArray(order.products) && order.products.length > 0
       ? order.products
       : (order.asin ? [{ asin: order.asin, qty: order.qty || 1 }] : []);
-    await sbPut('AMAZON_AUTO_ORDER', JSON.stringify({
-      status: 'PENDING', sid, mktId,
-      whName: order.whName, orderCode: order.orderCode,
-      asin: order.asin,          
-      qty: order.qty || 1,       
-      products: jobProducts,     
-      startedAt: Date.now()
-    }));
-    showToast('🛒 Amazon siparişi başlatıldı!', 'success');
 
-    await waitForStateChange(sid, mktId, (o) => !!o.bid || !!o.amazonDone, 120000);
+    const job = {
+      sid, mktId,
+      whName: order.whName, orderCode: order.orderCode,
+      asin: order.asin,
+      qty: order.qty || 1,
+      products: jobProducts,
+      queuedAt: Date.now()
+    };
+
+    // Queue'ya ekle
+    queue.push(job);
+    await sbPut('AMAZON_AUTO_ORDER_QUEUE', JSON.stringify(queue));
+
+    const queuePos = queue.length;
+    showToast(`🕒 Sıraya alındı #${queuePos} — ${sid}`, 'success');
+    _amazonQueue = queue;
+
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
 
   _pendingOps.delete(sid);
-  await refreshAll();
+  renderOrders();
+  refreshModalIfOpen();
+}
+
+async function doCancelQueue(sid, mktId) {
+  if (!confirm(`${sid} sıradan çıkarılsın mı?`)) return;
+
+  try {
+    const raw = await sbGet('AMAZON_AUTO_ORDER_QUEUE').catch(() => null);
+    if (!raw || raw === '') { showToast('Sıra boş', 'error'); return; }
+    const queue = typeof raw === 'object' ? raw : JSON.parse(raw);
+    const filtered = queue.filter(j => j.sid !== sid);
+    if (filtered.length === queue.length) { showToast('Sipariş sırada bulunamadı', 'error'); return; }
+    await sbPut('AMAZON_AUTO_ORDER_QUEUE', JSON.stringify(filtered));
+    _amazonQueue = filtered;
+    showToast(`✅ ${sid} sıradan çıkarıldı`, 'success');
+    await refreshAll();
+  } catch(e) { showToast('Hata: ' + e.message, 'error'); }
 }
 
 async function doCancelAmazon(event, sid, mktId) {
