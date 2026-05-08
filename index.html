@@ -1335,6 +1335,7 @@ function renderOrders() {
             <div class="product-cell">${order.productTitle||'—'}</div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
               <span class="asin-cell" style="display:inline-block">${order.asin||'—'}</span>
+              ${(order.qty && order.qty > 1) ? `<span style="margin-left:6px;background:rgba(255,123,0,0.15);color:var(--sf-orange);font-size:11px;font-weight:700;padding:2px 6px;border-radius:6px;font-family:var(--mono)">x${order.qty}</span>` : ''}
               <span class="price-cell">${priceHtml}</span>
             </div>
             <div class="action-cell" style="display:flex;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
@@ -1462,6 +1463,11 @@ function openModal(order) {
         <div class="detail-key">ASIN</div>
         <div class="detail-val"><a href="https://amazon.com/dp/${order.asin}" target="_blank" style="font-family:var(--mono);font-size:14px;color:var(--seller-blue)">${order.asin||'—'}</a></div>
       </div>
+      ${(order.qty && order.qty > 1) ? `
+      <div class="detail-item">
+        <div class="detail-key">Adet</div>
+        <div class="detail-val" style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--sf-orange)">${order.qty} adet</div>
+      </div>` : ''}
       <div class="detail-item">
         <div class="detail-key">Durum</div>
         <div class="detail-val" style="background:transparent;padding:0;border:none;box-shadow:none"><span class="state-badge ${stateCls(state)}">${stateLabel(state)}</span></div>
