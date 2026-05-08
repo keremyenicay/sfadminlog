@@ -1293,6 +1293,7 @@ function renderStores(storeNames) {
   }
 }
 
+// 1. GÜNCELLEME: Tabloya kargo rozeti ekliyoruz (Satır ~1235 civarı renderOrders fonksiyonu)
 function renderOrders() {
   const tbody = document.getElementById('orders-body');
   tbody.innerHTML = '';
@@ -1331,6 +1332,12 @@ function renderOrders() {
       ? new Date(order.deliveryEndDate).toLocaleDateString('tr-TR', {day:'2-digit', month:'short'})
       : '—';
 
+    // EKLENEN KISIM: Kargo Rozeti
+    const isExpedited = order.shipmentServiceLevelCategory === 'Expedited';
+    const shipBadge = isExpedited
+        ? '<span style="display:inline-block;margin-top:6px;padding:3px 8px;background:rgba(234,88,12,0.1);color:#ea580c;border:1px solid rgba(234,88,12,0.3);border-radius:6px;font-size:10px;font-weight:800;letter-spacing:0.5px">🚀 EXPEDITED (HIZLI)</span>'
+        : '<span style="display:inline-block;margin-top:6px;padding:3px 8px;background:rgba(100,116,139,0.1);color:#64748b;border:1px solid rgba(100,116,139,0.2);border-radius:6px;font-size:10px;font-weight:700;letter-spacing:0.5px">📦 STANDARD</span>';
+
     if (isMobile) {
       tr.innerHTML = `
         <td colspan="9" style="padding:0">
@@ -1339,7 +1346,7 @@ function renderOrders() {
               <span class="sid-cell">${order.sid||'—'}</span>
               <span class="state-badge ${stateCls(state)}">${isPending ? '⏳' : stateLabel(state)}</span>
             </div>
-            <div class="product-cell">${order.productTitle||'—'}</div>
+            <div class="product-cell">${order.productTitle||'—'}<br>${shipBadge}</div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
               <span class="asin-cell" style="display:inline-block">${order.asin||'—'}</span>
               <span class="price-cell">${priceHtml}</span>
@@ -1354,7 +1361,7 @@ function renderOrders() {
       if (isPending) tr.style.opacity = '0.55';
       tr.innerHTML = `
         <td class="sid-cell">${order.sid||'—'}</td>
-        <td class="product-cell" title="${order.productTitle||''}">${order.productTitle||'—'}</td>
+        <td class="product-cell" title="${order.productTitle||''}">${order.productTitle||'—'}<br>${shipBadge}</td>
         <td class="asin-cell">${order.asin||'—'}</td>
         <td><span class="state-badge ${stateCls(state)}">${isPending ? '⏳ İşleniyor' : stateLabel(state)}</span></td>
         <td class="price-cell">${priceHtml}</td>
@@ -1431,6 +1438,7 @@ function setFilter(f, btn) {
 }
 
 // ─── MODAL ────────────────────────────────────────────────────────────────────
+// 2. GÜNCELLEME: Açılır Popup (Modal) içine ekliyoruz (Satır ~1380 civarı openModal fonksiyonu)
 function openModal(order) {
   const state = getOrderState(order);
   const isPending = _pendingOps.has(order.sid);
@@ -1467,6 +1475,11 @@ function openModal(order) {
   const detects  = order.detectedAt  ? new Date(order.detectedAt).toLocaleString('tr-TR') : '—';
   const delivDate = order.deliveryEndDate ? new Date(order.deliveryEndDate).toLocaleString('tr-TR') : '—';
 
+  // EKLENEN KISIM: Modal İçi Kargo Rozeti
+  const isExpedited = order.shipmentServiceLevelCategory === 'Expedited';
+  const shipText = isExpedited ? '🚀 Expedited (Hızlı)' : '📦 Standard';
+  const shipColor = isExpedited ? 'color:#ea580c;font-weight:800;' : '';
+
   document.getElementById('modal-content').innerHTML = `
     <div class="detail-grid">
       <div class="detail-item">
@@ -1484,6 +1497,10 @@ function openModal(order) {
       <div class="detail-item">
         <div class="detail-key">Durum</div>
         <div class="detail-val" style="background:transparent;padding:0;border:none;box-shadow:none"><span class="state-badge ${stateCls(state)}">${stateLabel(state)}</span></div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-key">Kargo Tipi</div>
+        <div class="detail-val" style="${shipColor}">${shipText}</div>
       </div>
       <div class="detail-item">
         <div class="detail-key">Mağaza</div>
