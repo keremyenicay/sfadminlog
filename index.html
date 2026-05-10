@@ -538,6 +538,137 @@ td { padding: 16px 24px; vertical-align: middle; }
 
 
 /* ══════════════════════════════════════
+   KOMUT PANELİ
+══════════════════════════════════════ */
+#cmd-panel {
+  background: var(--glass-bg); border: 1px solid #ffffff;
+  border-radius: var(--radius); margin-bottom: 24px;
+  backdrop-filter: blur(12px); box-shadow: 0 8px 24px rgba(15,23,42,0.05);
+  overflow: hidden;
+}
+
+#cmd-panel-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 18px 24px; cursor: pointer;
+  user-select: none; -webkit-user-select: none;
+  transition: background .2s;
+  background: rgba(255,255,255,0.5);
+  border-bottom: 1px solid transparent;
+}
+#cmd-panel-header:hover { background: rgba(255,255,255,0.7); }
+#cmd-panel-header.open { border-bottom-color: var(--border); }
+
+.cmd-panel-icon {
+  width: 40px; height: 40px; flex-shrink: 0;
+  background: linear-gradient(135deg, #1e293b, #334155);
+  border-radius: 12px; display: flex; align-items: center;
+  justify-content: center; font-size: 18px;
+  box-shadow: 0 4px 12px rgba(15,23,42,0.15);
+}
+.cmd-panel-title {
+  flex: 1;
+  font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.2px;
+}
+.cmd-panel-sub {
+  font-size: 12px; color: var(--text3); margin-top: 2px; font-weight: 400;
+}
+.cmd-panel-chevron {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: var(--bg3); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text3); font-size: 12px; flex-shrink: 0;
+  transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1), background .2s;
+}
+.cmd-panel-chevron.open { transform: rotate(180deg); background: var(--bg4); }
+
+#cmd-panel-body {
+  display: none; padding: 20px 24px 24px;
+}
+#cmd-panel-body.open { display: block; }
+
+/* Global komutlar */
+.cmd-section-title {
+  font-size: 11px; font-weight: 700; color: var(--text3);
+  text-transform: uppercase; letter-spacing: 1.2px;
+  margin-bottom: 12px; margin-top: 20px;
+  display: flex; align-items: center; gap: 8px;
+}
+.cmd-section-title:first-child { margin-top: 0; }
+.cmd-section-title::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+.cmd-global-row {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;
+}
+
+.cmd-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  border: 1px solid transparent; cursor: pointer; transition: all .2s;
+  font-family: var(--sans); letter-spacing: 0.2px; -webkit-appearance: none;
+  white-space: nowrap;
+}
+.cmd-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(15,23,42,0.08); }
+.cmd-btn:active { transform: scale(0.95); }
+.cmd-btn.loading { opacity: 0.6; pointer-events: none; }
+
+.cmd-btn-fetch   { background: rgba(2,132,199,.1); color: var(--seller-blue); border-color: rgba(2,132,199,.25); }
+.cmd-btn-depot   { background: rgba(5,150,105,.1); color: var(--seller-green); border-color: rgba(5,150,105,.25); }
+.cmd-btn-amazon  { background: rgba(255,123,0,.1); color: var(--sf-orange); border-color: rgba(255,123,0,.25); }
+.cmd-btn-cargo   { background: rgba(109,40,217,.1); color: var(--purple2); border-color: rgba(109,40,217,.25); }
+.cmd-btn-teslim  { background: rgba(16,185,129,.1); color: #059669; border-color: rgba(16,185,129,.25); }
+.cmd-btn-stop    { background: rgba(225,29,72,.08); color: var(--red); border-color: rgba(225,29,72,.2); }
+.cmd-btn-depo-refresh { background: rgba(15,23,42,.06); color: var(--text2); border-color: var(--border2); }
+.cmd-btn-siparistara { background: rgba(2,132,199,.15); color: var(--seller-blue); border-color: rgba(2,132,199,.3); font-size: 14px; }
+
+.cmd-btn-fetch:hover   { background: rgba(2,132,199,.18); }
+.cmd-btn-depot:hover   { background: rgba(5,150,105,.18); }
+.cmd-btn-amazon:hover  { background: rgba(255,123,0,.18); }
+.cmd-btn-cargo:hover   { background: rgba(109,40,217,.18); }
+.cmd-btn-teslim:hover  { background: rgba(16,185,129,.18); }
+.cmd-btn-stop:hover    { background: rgba(225,29,72,.15); }
+.cmd-btn-depo-refresh:hover { background: rgba(15,23,42,.1); }
+.cmd-btn-siparistara:hover { background: rgba(2,132,199,.25); }
+
+/* Mağaza sekmeleri */
+.cmd-mkt-tabs {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.cmd-mkt-tab {
+  padding: 8px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all .2s; color: var(--text3);
+  border: 1px solid var(--border); background: var(--bg2);
+  font-family: var(--mono); -webkit-appearance: none;
+}
+.cmd-mkt-tab:hover { color: var(--text); border-color: var(--border2); background: var(--bg3); }
+.cmd-mkt-tab.active {
+  background: rgba(15,23,42,.07); color: var(--text);
+  border-color: var(--border2);
+}
+.cmd-mkt-tab.all-tab.active {
+  background: linear-gradient(135deg, rgba(255,123,0,.12), rgba(255,195,0,.08));
+  color: var(--sf-orange); border-color: rgba(255,123,0,.3);
+}
+
+/* Mağaza başına buton grid */
+.cmd-mkt-btn-grid {
+  display: flex; gap: 10px; flex-wrap: wrap;
+}
+
+/* Sonuç göstergesi */
+.cmd-result-bar {
+  margin-top: 16px; padding: 12px 16px;
+  border-radius: 12px; font-size: 13px; font-weight: 500;
+  border: 1px solid transparent; display: none;
+  animation: fadeInUp .25s ease;
+}
+.cmd-result-bar.show { display: flex; align-items: center; gap: 10px; }
+.cmd-result-bar.ok   { background: rgba(5,150,105,.08); color: var(--seller-green); border-color: rgba(5,150,105,.2); }
+.cmd-result-bar.err  { background: rgba(225,29,72,.08); color: var(--red); border-color: rgba(225,29,72,.2); }
+@keyframes fadeInUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+/* ══════════════════════════════════════
    MOBILE VIEW FIXES (TAMAMEN YENİLENDİ)
 ══════════════════════════════════════ */
 @media (max-width: 768px) {
@@ -555,6 +686,10 @@ td { padding: 16px 24px; vertical-align: middle; }
 
   /* Ana içerik padding'lerini daraltma */
   #main { padding: 16px 12px; }
+  #cmd-panel-header { padding: 14px 16px; }
+  #cmd-panel-body { padding: 16px 14px 18px; }
+  .cmd-btn { padding: 9px 14px; font-size: 12px; }
+  .cmd-global-row { gap: 8px; }
   
   /* Mağaza Kartları taşımasını önleme */
   #stores-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -835,6 +970,35 @@ td { padding: 16px 24px; vertical-align: middle; }
 
   <!-- Store Cards -->
   <div id="stores-grid"></div>
+
+  <!-- ═══ KOMUT PANELİ ═══ -->
+  <div id="cmd-panel">
+    <div id="cmd-panel-header" onclick="toggleCmdPanel()">
+      <div class="cmd-panel-icon">⚡</div>
+      <div style="flex:1">
+        <div class="cmd-panel-title">Komut Paneli</div>
+        <div class="cmd-panel-sub">Mağazalara Telegram komutu gönder</div>
+      </div>
+      <div class="cmd-panel-chevron" id="cmd-chevron">▾</div>
+    </div>
+    <div id="cmd-panel-body">
+      <div class="cmd-section-title">Tüm Mağazalara Gönder</div>
+      <div class="cmd-global-row">
+        <button class="cmd-btn cmd-btn-siparistara" onclick="sendCmdAll('siparistara')">📥 Sipariş Tara</button>
+        <button class="cmd-btn cmd-btn-fetch" onclick="sendCmdAll('vericek')">🔄 Veri Çek</button>
+        <button class="cmd-btn cmd-btn-depot" onclick="sendCmdAll('depotara')">🏭 Depo Tara</button>
+        <button class="cmd-btn cmd-btn-amazon" onclick="sendCmdAll('amazontara')">🛒 Amazon Tara</button>
+        <button class="cmd-btn cmd-btn-cargo" onclick="sendCmdAll('kargosorgula')">📦 Kargo Sorgula</button>
+        <button class="cmd-btn cmd-btn-teslim" onclick="sendCmdAll('teslim')">✅ Teslim Sync</button>
+        <button class="cmd-btn cmd-btn-depo-refresh" onclick="sendSpecialCmd('depo_yenile')">🔑 Depo Tokenları Yenile</button>
+        <button class="cmd-btn cmd-btn-stop" onclick="sendCmdAll('durdur')">⏹ Durdur</button>
+      </div>
+      <div class="cmd-section-title">Mağaza Seç</div>
+      <div class="cmd-mkt-tabs" id="cmd-mkt-tabs"></div>
+      <div id="cmd-mkt-buttons" class="cmd-mkt-btn-grid"></div>
+      <div class="cmd-result-bar" id="cmd-result-bar"></div>
+    </div>
+  </div>
 
   <!-- Orders Panel -->
   <div id="orders-panel">
@@ -1837,6 +2001,114 @@ async function refreshAll() {
   } finally {
     _isRefreshing = false;
   }
+}
+
+// ─── KOMUT PANELİ ──────────────────────────────────────────────────────────────
+let _cmdPanelOpen = false;
+let _cmdActiveMkt = null; // null = tüm mağazalar, string = belirli mağaza
+
+function toggleCmdPanel() {
+  _cmdPanelOpen = !_cmdPanelOpen;
+  const body    = document.getElementById('cmd-panel-body');
+  const header  = document.getElementById('cmd-panel-header');
+  const chevron = document.getElementById('cmd-chevron');
+  body.className    = _cmdPanelOpen ? 'open' : '';
+  header.className  = _cmdPanelOpen ? 'open' : '';
+  chevron.className = 'cmd-panel-chevron' + (_cmdPanelOpen ? ' open' : '');
+  if (_cmdPanelOpen) renderCmdMktTabs();
+}
+
+function renderCmdMktTabs() {
+  const allMktIds = (CFG.mkts || []);
+  if (!allMktIds.length) return;
+
+  const tabsEl = document.getElementById('cmd-mkt-tabs');
+  tabsEl.innerHTML = '';
+
+  // "Tüm" tab
+  const allTab = document.createElement('button');
+  allTab.className = 'cmd-mkt-tab all-tab' + (_cmdActiveMkt === null ? ' active' : '');
+  allTab.textContent = '🏪 Tüm Mağazalar';
+  allTab.onclick = () => { _cmdActiveMkt = null; renderCmdMktTabs(); renderCmdMktButtons(); };
+  tabsEl.appendChild(allTab);
+
+  allMktIds.forEach(mktId => {
+    const tab = document.createElement('button');
+    tab.className = 'cmd-mkt-tab' + (_cmdActiveMkt === mktId ? ' active' : '');
+    tab.textContent = mktId;
+    tab.onclick = () => { _cmdActiveMkt = mktId; renderCmdMktTabs(); renderCmdMktButtons(); };
+    tabsEl.appendChild(tab);
+  });
+
+  renderCmdMktButtons();
+}
+
+function renderCmdMktButtons() {
+  const grid = document.getElementById('cmd-mkt-buttons');
+  if (_cmdActiveMkt === null) {
+    grid.style.display = 'none';
+    return;
+  }
+  grid.style.display = 'flex';
+  const mktId = _cmdActiveMkt;
+  grid.innerHTML = `
+    <button class="cmd-btn cmd-btn-siparistara" onclick="sendCmdToMkt('siparistara','${mktId}')">📥 Sipariş Tara</button>
+    <button class="cmd-btn cmd-btn-fetch"   onclick="sendCmdToMkt('vericek','${mktId}')">🔄 Veri Çek</button>
+    <button class="cmd-btn cmd-btn-depot"   onclick="sendCmdToMkt('depotara','${mktId}')">🏭 Depo Tara</button>
+    <button class="cmd-btn cmd-btn-amazon"  onclick="sendCmdToMkt('amazontara','${mktId}')">🛒 Amazon Tara</button>
+    <button class="cmd-btn cmd-btn-cargo"   onclick="sendCmdToMkt('kargosorgula','${mktId}')">📦 Kargo Sorgula</button>
+    <button class="cmd-btn cmd-btn-teslim"  onclick="sendCmdToMkt('teslim','${mktId}')">✅ Teslim Sync</button>
+    <button class="cmd-btn cmd-btn-stop"    onclick="sendCmdToMkt('durdur','${mktId}')">⏹ Durdur</button>
+  `;
+}
+
+function showCmdResult(msg, ok = true) {
+  const bar = document.getElementById('cmd-result-bar');
+  bar.className = 'cmd-result-bar show ' + (ok ? 'ok' : 'err');
+  bar.innerHTML = (ok ? '✅ ' : '❌ ') + msg;
+  clearTimeout(bar._t);
+  bar._t = setTimeout(() => { bar.className = 'cmd-result-bar'; }, 4000);
+}
+
+async function sendCmdAll(cmd) {
+  const allMktIds = (CFG.mkts || []);
+  if (!allMktIds.length) { showCmdResult('Kayıtlı mağaza yok!', false); return; }
+  const btn = event.currentTarget;
+  btn.classList.add('loading');
+  try {
+    for (const mktId of allMktIds) {
+      await sbPut(`TG_CMD_${mktId}`, cmd);
+    }
+    showCmdResult(`/${cmd} → tüm mağazalar (${allMktIds.length}) gönderildi`);
+  } catch(e) {
+    showCmdResult('Hata: ' + e.message, false);
+  }
+  btn.classList.remove('loading');
+}
+
+async function sendCmdToMkt(cmd, mktId) {
+  const btn = event.currentTarget;
+  btn.classList.add('loading');
+  try {
+    await sbPut(`TG_CMD_${mktId}`, cmd);
+    showCmdResult(`/${cmd} → Mağaza ${mktId} gönderildi`);
+  } catch(e) {
+    showCmdResult('Hata: ' + e.message, false);
+  }
+  btn.classList.remove('loading');
+}
+
+async function sendSpecialCmd(cmd) {
+  const btn = event.currentTarget;
+  btn.classList.add('loading');
+  try {
+    // Özel komutlar: tüm mağazalar için TG_CMD yerine özel key
+    await sbPut('TG_SPECIAL_CMD', cmd);
+    showCmdResult(`/${cmd} komutu sunucuya iletildi`);
+  } catch(e) {
+    showCmdResult('Hata: ' + e.message, false);
+  }
+  btn.classList.remove('loading');
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
