@@ -902,6 +902,8 @@ td { padding: 16px 24px; vertical-align: middle; }
     <input class="cfg-input" id="cfg-key" type="password" placeholder="eyJ..." autocomplete="off">
     <div class="cfg-label">Marketplace ID'ler (virgülle)</div>
     <input class="cfg-input" id="cfg-mkts" type="text" placeholder="78524,87709" value="78524,87709" autocomplete="off" autocorrect="off">
+    <div class="cfg-label">Sunucu URL (Komut Paneli için)</div>
+    <input class="cfg-input" id="cfg-server" type="url" placeholder="https://your-app.railway.app" autocomplete="off" autocorrect="off" autocapitalize="off">
     <div class="cfg-note">🔒 Ayarlar yalnızca bu tarayıcıda (Local Storage) saklanır.</div>
     <button id="cfg-save">Bağlan →</button>
   </div>
@@ -984,14 +986,14 @@ td { padding: 16px 24px; vertical-align: middle; }
     <div id="cmd-panel-body">
       <div class="cmd-section-title">Tüm Mağazalara Gönder</div>
       <div class="cmd-global-row">
-        <button class="cmd-btn cmd-btn-siparistara" onclick="sendCmdAll('siparistara')">📥 Sipariş Tara</button>
-        <button class="cmd-btn cmd-btn-fetch" onclick="sendCmdAll('vericek')">🔄 Veri Çek</button>
-        <button class="cmd-btn cmd-btn-depot" onclick="sendCmdAll('depotara')">🏭 Depo Tara</button>
-        <button class="cmd-btn cmd-btn-amazon" onclick="sendCmdAll('amazontara')">🛒 Amazon Tara</button>
-        <button class="cmd-btn cmd-btn-cargo" onclick="sendCmdAll('kargosorgula')">📦 Kargo Sorgula</button>
-        <button class="cmd-btn cmd-btn-teslim" onclick="sendCmdAll('teslim')">✅ Teslim Sync</button>
-        <button class="cmd-btn cmd-btn-depo-refresh" onclick="sendSpecialCmd('depo_yenile')">🔑 Depo Tokenları Yenile</button>
-        <button class="cmd-btn cmd-btn-stop" onclick="sendCmdAll('durdur')">⏹ Durdur</button>
+        <button class="cmd-btn cmd-btn-siparistara" onclick="triggerCmdAll('siparistara',this)">📥 Sipariş Tara</button>
+        <button class="cmd-btn cmd-btn-fetch" onclick="triggerCmdAll('vericek',this)">🔄 Veri Çek</button>
+        <button class="cmd-btn cmd-btn-depot" onclick="triggerCmdAll('depotara',this)">🏭 Depo Tara</button>
+        <button class="cmd-btn cmd-btn-amazon" onclick="triggerCmdAll('amazontara',this)">🛒 Amazon Tara</button>
+        <button class="cmd-btn cmd-btn-cargo" onclick="triggerCmdAll('kargosorgula',this)">📦 Kargo Sorgula</button>
+        <button class="cmd-btn cmd-btn-teslim" onclick="triggerCmdAll('teslim',this)">✅ Teslim Sync</button>
+        <button class="cmd-btn cmd-btn-depo-refresh" onclick="triggerCmdAll('depo_yenile',this)">🔑 Depo Tokenları Yenile</button>
+        <button class="cmd-btn cmd-btn-stop" onclick="triggerCmdAll('durdur',this)">⏹ Durdur</button>
       </div>
       <div class="cmd-section-title">Mağaza Seç</div>
       <div class="cmd-mkt-tabs" id="cmd-mkt-tabs"></div>
@@ -1060,7 +1062,7 @@ td { padding: 16px 24px; vertical-align: middle; }
 
 <script>
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
-let CFG = { url: '', key: '', mkts: ['78524', '87709'] };
+let CFG = { url: '', key: '', mkts: ['78524', '87709'], serverUrl: '' };
 let _allOrders    = [];
 let _activeFilter = 'all';
 let _activeMkt    = null;
@@ -1080,20 +1082,22 @@ function loadConfig() {
 }
 
 function saveConfig() {
-  const url  = document.getElementById('cfg-url').value.trim().replace(/\/$/, '');
-  const key  = document.getElementById('cfg-key').value.trim();
-  const mkts = document.getElementById('cfg-mkts').value.split(',').map(s => s.trim()).filter(Boolean);
+  const url       = document.getElementById('cfg-url').value.trim().replace(/\/$/, '');
+  const key       = document.getElementById('cfg-key').value.trim();
+  const mkts      = document.getElementById('cfg-mkts').value.split(',').map(s => s.trim()).filter(Boolean);
+  const serverUrl = document.getElementById('cfg-server').value.trim().replace(/\/$/, '');
   if (!url || !key) { showToast('URL ve Key zorunludur!', 'error'); return; }
-  CFG = { url, key, mkts };
+  CFG = { url, key, mkts, serverUrl };
   localStorage.setItem('sf_cfg', JSON.stringify(CFG));
   document.getElementById('config-overlay').style.display = 'none';
   init();
 }
 
 function openSettings() {
-  document.getElementById('cfg-url').value  = CFG.url  || '';
-  document.getElementById('cfg-key').value  = CFG.key  || '';
-  document.getElementById('cfg-mkts').value = (CFG.mkts || []).join(',');
+  document.getElementById('cfg-url').value    = CFG.url    || '';
+  document.getElementById('cfg-key').value    = CFG.key    || '';
+  document.getElementById('cfg-mkts').value   = (CFG.mkts || []).join(',');
+  document.getElementById('cfg-server').value = CFG.serverUrl || '';
   document.getElementById('config-overlay').style.display = 'flex';
 }
 
@@ -2005,7 +2009,7 @@ async function refreshAll() {
 
 // ─── KOMUT PANELİ ──────────────────────────────────────────────────────────────
 let _cmdPanelOpen = false;
-let _cmdActiveMkt = null; // null = tüm mağazalar, string = belirli mağaza
+let _cmdActiveMkt = null;
 
 function toggleCmdPanel() {
   _cmdPanelOpen = !_cmdPanelOpen;
@@ -2021,11 +2025,9 @@ function toggleCmdPanel() {
 function renderCmdMktTabs() {
   const allMktIds = (CFG.mkts || []);
   if (!allMktIds.length) return;
-
   const tabsEl = document.getElementById('cmd-mkt-tabs');
   tabsEl.innerHTML = '';
 
-  // "Tüm" tab
   const allTab = document.createElement('button');
   allTab.className = 'cmd-mkt-tab all-tab' + (_cmdActiveMkt === null ? ' active' : '');
   allTab.textContent = '🏪 Tüm Mağazalar';
@@ -2045,20 +2047,17 @@ function renderCmdMktTabs() {
 
 function renderCmdMktButtons() {
   const grid = document.getElementById('cmd-mkt-buttons');
-  if (_cmdActiveMkt === null) {
-    grid.style.display = 'none';
-    return;
-  }
-  grid.style.display = 'flex';
+  if (_cmdActiveMkt === null) { grid.style.display = 'none'; return; }
   const mktId = _cmdActiveMkt;
+  grid.style.display = 'flex';
   grid.innerHTML = `
-    <button class="cmd-btn cmd-btn-siparistara" onclick="sendCmdToMkt('siparistara','${mktId}')">📥 Sipariş Tara</button>
-    <button class="cmd-btn cmd-btn-fetch"   onclick="sendCmdToMkt('vericek','${mktId}')">🔄 Veri Çek</button>
-    <button class="cmd-btn cmd-btn-depot"   onclick="sendCmdToMkt('depotara','${mktId}')">🏭 Depo Tara</button>
-    <button class="cmd-btn cmd-btn-amazon"  onclick="sendCmdToMkt('amazontara','${mktId}')">🛒 Amazon Tara</button>
-    <button class="cmd-btn cmd-btn-cargo"   onclick="sendCmdToMkt('kargosorgula','${mktId}')">📦 Kargo Sorgula</button>
-    <button class="cmd-btn cmd-btn-teslim"  onclick="sendCmdToMkt('teslim','${mktId}')">✅ Teslim Sync</button>
-    <button class="cmd-btn cmd-btn-stop"    onclick="sendCmdToMkt('durdur','${mktId}')">⏹ Durdur</button>
+    <button class="cmd-btn cmd-btn-siparistara" onclick="triggerCmd('siparistara','${mktId}',this)">📥 Sipariş Tara</button>
+    <button class="cmd-btn cmd-btn-fetch"   onclick="triggerCmd('vericek','${mktId}',this)">🔄 Veri Çek</button>
+    <button class="cmd-btn cmd-btn-depot"   onclick="triggerCmd('depotara','${mktId}',this)">🏭 Depo Tara</button>
+    <button class="cmd-btn cmd-btn-amazon"  onclick="triggerCmd('amazontara','${mktId}',this)">🛒 Amazon Tara</button>
+    <button class="cmd-btn cmd-btn-cargo"   onclick="triggerCmd('kargosorgula','${mktId}',this)">📦 Kargo Sorgula</button>
+    <button class="cmd-btn cmd-btn-teslim"  onclick="triggerCmd('teslim','${mktId}',this)">✅ Teslim Sync</button>
+    <button class="cmd-btn cmd-btn-stop"    onclick="triggerCmd('durdur','${mktId}',this)">⏹ Durdur</button>
   `;
 }
 
@@ -2067,48 +2066,55 @@ function showCmdResult(msg, ok = true) {
   bar.className = 'cmd-result-bar show ' + (ok ? 'ok' : 'err');
   bar.innerHTML = (ok ? '✅ ' : '❌ ') + msg;
   clearTimeout(bar._t);
-  bar._t = setTimeout(() => { bar.className = 'cmd-result-bar'; }, 4000);
+  bar._t = setTimeout(() => { bar.className = 'cmd-result-bar'; }, 5000);
 }
 
-async function sendCmdAll(cmd) {
-  const allMktIds = (CFG.mkts || []);
-  if (!allMktIds.length) { showCmdResult('Kayıtlı mağaza yok!', false); return; }
-  const btn = event.currentTarget;
-  btn.classList.add('loading');
+// Sunucu URL'ini CFG'den al (Supabase URL'i değil, kendi sunucu URL'in)
+function getServerUrl() {
+  // CFG.serverUrl varsa kullan, yoksa aynı origin'den serve ediliyorsa boş bırak
+  return (CFG.serverUrl || '').replace(/\/$/, '');
+}
+
+async function triggerCmd(cmd, mktId, btn) {
+  if (btn) btn.classList.add('loading');
+  const serverUrl = getServerUrl();
   try {
-    for (const mktId of allMktIds) {
-      await sbPut(`TG_CMD_${mktId}`, cmd);
+    const res = await fetch(`${serverUrl}/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd, mktId: mktId || null })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showCmdResult(data.msg || `/${cmd} tetiklendi`);
+    } else {
+      showCmdResult(data.error || 'Sunucu hatası', false);
     }
-    showCmdResult(`/${cmd} → tüm mağazalar (${allMktIds.length}) gönderildi`);
   } catch(e) {
-    showCmdResult('Hata: ' + e.message, false);
+    showCmdResult(`Bağlantı hatası: ${e.message} — Sunucu URL ayarlı mı?`, false);
   }
-  btn.classList.remove('loading');
+  if (btn) btn.classList.remove('loading');
 }
 
-async function sendCmdToMkt(cmd, mktId) {
-  const btn = event.currentTarget;
-  btn.classList.add('loading');
+async function triggerCmdAll(cmd, btn) {
+  if (btn) btn.classList.add('loading');
+  const serverUrl = getServerUrl();
   try {
-    await sbPut(`TG_CMD_${mktId}`, cmd);
-    showCmdResult(`/${cmd} → Mağaza ${mktId} gönderildi`);
+    const res = await fetch(`${serverUrl}/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd, mktId: null })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showCmdResult(data.msg || `/${cmd} → tüm mağazalar tetiklendi`);
+    } else {
+      showCmdResult(data.error || 'Sunucu hatası', false);
+    }
   } catch(e) {
-    showCmdResult('Hata: ' + e.message, false);
+    showCmdResult(`Bağlantı hatası: ${e.message}`, false);
   }
-  btn.classList.remove('loading');
-}
-
-async function sendSpecialCmd(cmd) {
-  const btn = event.currentTarget;
-  btn.classList.add('loading');
-  try {
-    // Özel komutlar: tüm mağazalar için TG_CMD yerine özel key
-    await sbPut('TG_SPECIAL_CMD', cmd);
-    showCmdResult(`/${cmd} komutu sunucuya iletildi`);
-  } catch(e) {
-    showCmdResult('Hata: ' + e.message, false);
-  }
-  btn.classList.remove('loading');
+  if (btn) btn.classList.remove('loading');
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
