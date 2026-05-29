@@ -1175,6 +1175,43 @@ async function fetchAllData() {
     storeNames[mktId] = await fetchStoreName(mktId);
   }
 
+  // Canlı kur çek (EUR, GBP, AUD → TRY)
+  let _rates = { EUR: 1, GBP: 1, AUD: 1 };
+  try {
+    const rRes = await fetch('https://api.exchangerate-api.com/v4/latest/TRY');
+    if (rRes.ok) {
+      const rJson = await rRes.json();
+      const r = rJson.rates || {};
+      // TRY bazlı API → 1 TRY = X birim, biz X birim = ? TRY istiyoruz
+      if (r.EUR) _rates.EUR = 1 / r.EUR;
+      if (r.GBP) _rates.GBP = 1 / r.GBP;
+      if (r.AUD) _rates.AUD = 1 / r.AUD;
+    }
+  } catch(e) {}
+  window._fxRates = _rates;
+
+  // Kâr verilerini tüm mağazalardan topla
+  const _profitData = {}; // mktId → { total, todayTotal, currency, totalTRY, todayTotalTRY }
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+
+  for (const mktId of CFG.mkts) {
+    try {
+      const rawDb = await sbGet(`DB_${mktId}`);
+      const dbFull = rawDb ? ((typeof rawDb === 'object') ? rawDb : JSON.parse(rawDb)) : {};
+      let total = 0, todayTotal = 0;
+      for (const [sid, o] of Object.entries(dbFull)) {
+        const profit = parseFloat(o.finalProfit ?? o.profit ?? 0) || 0;
+        if (!profit) continue;
+        total += profit;
+        if (o.orderDate && o.orderDate >= todayStart.getTime()) todayTotal += profit;
+      }
+      const currency = ['78524','216116','87709'].includes(String(mktId)) ? 'AUD' : String(mktId) === '191308' ? 'GBP' : 'EUR';
+      const rate = _rates[currency] || 1;
+      _profitData[mktId] = { total, todayTotal, currency, totalTRY: total * rate, todayTotalTRY: todayTotal * rate };
+    } catch(e) { _profitData[mktId] = { total:0, todayTotal:0, currency:'EUR', totalTRY:0, todayTotalTRY:0 }; }
+  }
+  window._profitData = _profitData;
+
   for (const mktId of CFG.mkts) {
     try {
       const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
@@ -1433,6 +1470,35 @@ function renderStores(storeNames) {
   const totalPending = Object.values(mktCounts).reduce((s,m) => s + m.new + m.active, 0);
   const totalDone    = Object.values(mktCounts).reduce((s,m) => s + m.done, 0);
   const totalAll     = Object.values(mktCounts).reduce((s,m) => s + m.total, 0);
+  allCard.onclick = () => { _activeMkt = null; renderStores(storeNames); renderOrders(); };
+  grid.appendChild(allCard);
+
+  // Tüm mağazalar kartına toplam kâr ekle
+  let allTotalProfit = 0, allTodayProfit = 0;
+  const profitByCurrency = {};
+  const todayByCurrency  = {};
+  const pd = window._profitData || {};
+  for (const mktId of CFG.mkts) {
+    const p = pd[mktId] || {};
+    const cur = p.currency || 'EUR';
+    profitByCurrency[cur] = (profitByCurrency[cur] || 0) + (p.total || 0);
+    todayByCurrency[cur]  = (todayByCurrency[cur]  || 0) + (p.todayTotal || 0);
+  }
+  const fmtCur = (val, cur) => {
+    const sym = cur === 'AUD' ? 'A$' : cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : '$';
+    return `${sym}${parseFloat(val).toFixed(2)}`;
+  };
+  const allProfitHtml = Object.entries(profitByCurrency).map(([cur, val]) =>
+    `<span style="font-weight:700;color:var(--seller-green);font-family:var(--mono);font-size:13px">${fmtCur(val,cur)}</span>`
+  ).join(' <span style="color:var(--text3)">·</span> ');
+  const allTodayHtml = Object.entries(todayByCurrency).map(([cur, val]) =>
+    `<span style="font-weight:600;color:var(--green);font-family:var(--mono);font-size:12px">${fmtCur(val,cur)}</span>`
+  ).join(' <span style="color:var(--text3)">·</span> ');
+  // TRY toplamları
+  let allTotalTRY = 0, allTodayTRY = 0;
+  for (const mktId of CFG.mkts) { const p = pd[mktId]||{}; allTotalTRY += p.totalTRY||0; allTodayTRY += p.todayTotalTRY||0; }
+  const fmtTRY = val => '₺' + parseFloat(val).toLocaleString('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2});
+
   allCard.innerHTML = `
     <div class="store-name">Tüm Mağazalar</div>
     <div class="store-mkt">Birleşik Görünüm</div>
@@ -1440,14 +1506,22 @@ function renderStores(storeNames) {
       <div class="sc"><div class="sc-num orange">${totalPending}</div><div class="sc-label">Bekleyen</div></div>
       <div class="sc"><div class="sc-num green">${totalDone}</div><div class="sc-label">Tamam</div></div>
       <div class="sc"><div class="sc-num gray">${totalAll}</div><div class="sc-label">Toplam</div></div>
+    </div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Toplam Kâr</div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${allProfitHtml || '<span style="color:var(--text3)">—</span>'} <span style="font-weight:700;color:#dc2626;font-family:var(--mono);font-size:13px">${fmtTRY(allTotalTRY)}</span></div>
+      <div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-top:6px;margin-bottom:3px">Bugünkü Kâr</div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${allTodayHtml || '<span style="color:var(--text3)">—</span>'} <span style="font-weight:600;color:#dc2626;font-family:var(--mono);font-size:12px">${fmtTRY(allTodayTRY)}</span></div>
     </div>`;
-  allCard.onclick = () => { _activeMkt = null; renderStores(storeNames); renderOrders(); };
-  grid.appendChild(allCard);
 
   for (const mktId of CFG.mkts) {
     const m = mktCounts[mktId];
+    const p = pd[mktId] || {};
+    const cur = p.currency || 'EUR';
     const card = document.createElement('div');
     card.className = 'store-card' + (_activeMkt === mktId ? ' active' : '');
+    const profitStr = p.total ? fmtCur(p.total, cur) : '—';
+    const todayStr  = p.todayTotal ? fmtCur(p.todayTotal, cur) : '—';
     card.innerHTML = `
       <div class="store-name">${storeNames[mktId] || mktId}</div>
       <div class="store-mkt">ID: ${mktId}</div>
@@ -1455,6 +1529,22 @@ function renderStores(storeNames) {
         <div class="sc"><div class="sc-num orange">${m.new}</div><div class="sc-label">Yeni</div></div>
         <div class="sc"><div class="sc-num blue">${m.active}</div><div class="sc-label">Aktif</div></div>
         <div class="sc"><div class="sc-num green">${m.done}</div><div class="sc-label">Tamam</div></div>
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+          <span style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.8px">Toplam Kâr</span>
+          <span style="display:flex;gap:5px;align-items:center">
+            <span style="font-weight:700;color:var(--seller-green);font-family:var(--mono);font-size:12px">${profitStr}</span>
+            <span style="font-weight:700;color:#dc2626;font-family:var(--mono);font-size:12px">${fmtTRY(p.totalTRY||0)}</span>
+          </span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.8px">Bugünkü Kâr</span>
+          <span style="display:flex;gap:5px;align-items:center">
+            <span style="font-weight:600;color:var(--green);font-family:var(--mono);font-size:12px">${todayStr}</span>
+            <span style="font-weight:600;color:#dc2626;font-family:var(--mono);font-size:12px">${fmtTRY(p.todayTotalTRY||0)}</span>
+          </span>
+        </div>
       </div>`;
     card.onclick = () => { _activeMkt = mktId; renderStores(storeNames); renderOrders(); };
     grid.appendChild(card);
