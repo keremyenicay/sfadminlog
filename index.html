@@ -977,6 +977,41 @@ td { padding: 16px 24px; vertical-align: middle; }
 </div>
 
 <!-- MAIN -->
+<!-- KÂR RAPORU VIEW (ayrı sayfa) -->
+<div id="profit-view" style="display:none;position:fixed;inset:0;z-index:60;background:linear-gradient(135deg,#e6effa 0%,#f4f7fb 100%);overflow-y:auto;padding-top:calc(70px + var(--safe-top));">
+  <div style="max-width:900px;margin:0 auto;padding:16px 16px calc(16px + var(--safe-bot));">
+    <!-- Özet Kartlar -->
+    <div id="profit-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;"></div>
+    <!-- Dönem Filtreleri -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <button class="profit-period-btn active" onclick="setProfitPeriod('today',this)">Bugün</button>
+      <button class="profit-period-btn" onclick="setProfitPeriod('yesterday',this)">Dün</button>
+      <button class="profit-period-btn" onclick="setProfitPeriod('week',this)">Son 7 Gün</button>
+      <button class="profit-period-btn" onclick="setProfitPeriod('month',this)">Bu Ay</button>
+      <button class="profit-period-btn" onclick="setProfitPeriod('month30',this)">Son 30 Gün</button>
+      <button class="profit-period-btn" onclick="setProfitPeriod('all',this)">Tümü</button>
+    </div>
+    <!-- Mağaza Filtresi -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;" id="profit-mkt-filter"></div>
+    <!-- Tablo -->
+    <div style="background:var(--bg1);border-radius:16px;border:1px solid var(--border);overflow:hidden;box-shadow:0 4px 20px rgba(15,23,42,0.05);">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:var(--bg2);border-bottom:2px solid var(--border);">
+            <th style="padding:10px 16px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;white-space:nowrap;">Sipariş No</th>
+            <th style="padding:10px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">Mağaza</th>
+            <th style="padding:10px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">Tarih</th>
+            <th style="padding:10px 10px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">Kâr</th>
+            <th style="padding:10px 16px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">₺</th>
+          </tr>
+        </thead>
+        <tbody id="profit-tbody"></tbody>
+      </table>
+      <div id="profit-empty" style="display:none;text-align:center;padding:32px;color:var(--text3);font-size:14px;">Bu dönem için kâr verisi bulunamadı.</div>
+    </div>
+  </div>
+</div>
+
 <div id="main">
   <!-- Amazon Log Terminal -->
   <div id="amazon-log-panel">
@@ -1027,41 +1062,6 @@ td { padding: 16px 24px; vertical-align: middle; }
       <div class="cmd-mkt-tabs" id="cmd-mkt-tabs"></div>
       <div id="cmd-mkt-buttons" class="cmd-mkt-btn-grid"></div>
       <div class="cmd-result-bar" id="cmd-result-bar"></div>
-    </div>
-  </div>
-
-  <!-- Kâr Raporu Paneli -->
-  <div id="profit-panel" style="display:none;margin:0 16px 16px;background:var(--bg1);border-radius:20px;border:1px solid var(--border);box-shadow:0 4px 24px rgba(15,23,42,0.06);overflow:hidden;">
-    <div style="padding:20px 20px 0;">
-      <!-- Özet Kartlar -->
-      <div id="profit-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;"></div>
-      <!-- Dönem Filtreleri -->
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-        <button class="profit-period-btn active" onclick="setProfitPeriod('today',this)">Bugün</button>
-        <button class="profit-period-btn" onclick="setProfitPeriod('yesterday',this)">Dün</button>
-        <button class="profit-period-btn" onclick="setProfitPeriod('week',this)">Son 7 Gün</button>
-        <button class="profit-period-btn" onclick="setProfitPeriod('month',this)">Bu Ay</button>
-        <button class="profit-period-btn" onclick="setProfitPeriod('month30',this)">Son 30 Gün</button>
-        <button class="profit-period-btn" onclick="setProfitPeriod('all',this)">Tümü</button>
-      </div>
-      <!-- Mağaza Filtresi -->
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="profit-mkt-filter"></div>
-    </div>
-    <!-- Liste -->
-    <div id="profit-list" style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead>
-          <tr style="background:var(--bg2);border-bottom:1px solid var(--border);">
-            <th style="padding:10px 16px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">Sipariş No</th>
-            <th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">Mağaza</th>
-            <th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">Tarih</th>
-            <th style="padding:10px 12px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">Kâr</th>
-            <th style="padding:10px 16px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">₺ Karşılığı</th>
-          </tr>
-        </thead>
-        <tbody id="profit-tbody"></tbody>
-      </table>
-      <div id="profit-empty" style="display:none;text-align:center;padding:40px;color:var(--text3);font-size:14px;">Bu dönem için kâr verisi bulunamadı.</div>
     </div>
   </div>
 
@@ -2273,11 +2273,14 @@ let _profitPanelOpen = false;
 
 function toggleProfitPanel() {
   _profitPanelOpen = !_profitPanelOpen;
-  const panel = document.getElementById('profit-panel');
+  const view  = document.getElementById('profit-view');
+  const main  = document.getElementById('main');
   const btn   = document.getElementById('profit-tab-btn');
-  panel.style.display = _profitPanelOpen ? 'block' : 'none';
-  btn.style.background = _profitPanelOpen ? 'rgba(255,123,0,0.15)' : '';
-  btn.style.borderColor = _profitPanelOpen ? 'rgba(255,123,0,0.4)' : '';
+  view.style.display  = _profitPanelOpen ? 'block' : 'none';
+  main.style.display  = _profitPanelOpen ? 'none'  : '';
+  btn.style.background   = _profitPanelOpen ? 'rgba(255,123,0,0.15)' : '';
+  btn.style.borderColor  = _profitPanelOpen ? 'rgba(255,123,0,0.4)'  : '';
+  btn.style.color        = _profitPanelOpen ? 'var(--sf-orange)' : '';
   if (_profitPanelOpen) renderProfitPanel();
 }
 
@@ -2358,12 +2361,12 @@ function renderProfitPanel() {
     const p = parseFloat(o.finalProfit) || 0;
     const tryVal = p * (rates[cur]||1);
     const profitColor = p >= 0 ? 'var(--seller-green)' : 'var(--red)';
-    return `<tr class="profit-row" style="border-bottom:1px solid var(--border);cursor:default;">
-      <td style="padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--seller-blue)">${o.sid||'—'}</td>
-      <td style="padding:10px 12px;font-size:12px;color:var(--text2)">${o.mktId||'—'}</td>
-      <td style="padding:10px 12px;font-size:12px;color:var(--text3)">${fmtDate(o.orderDate)}</td>
-      <td style="padding:10px 12px;text-align:right;font-family:var(--mono);font-weight:700;color:${profitColor}">${fmtCur(p,cur)}</td>
-      <td style="padding:10px 16px;text-align:right;font-family:var(--mono);font-size:12px;color:#dc2626">${fmtTRY(tryVal)}</td>
+    return `<tr class="profit-row" style="border-bottom:1px solid var(--border);">
+      <td style="padding:7px 16px;font-family:var(--mono);font-size:12px;color:var(--seller-blue);white-space:nowrap;">${o.sid||'—'}</td>
+      <td style="padding:7px 10px;font-size:11px;color:var(--text3);font-family:var(--mono)">${o.mktId||'—'}</td>
+      <td style="padding:7px 10px;font-size:11px;color:var(--text3);white-space:nowrap;">${fmtDate(o.orderDate)}</td>
+      <td style="padding:7px 10px;text-align:right;font-family:var(--mono);font-size:13px;font-weight:700;color:${profitColor}">${fmtCur(p,cur)}</td>
+      <td style="padding:7px 16px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:#dc2626">${fmtTRY(tryVal)}</td>
     </tr>`;
   }).join('');
 }
