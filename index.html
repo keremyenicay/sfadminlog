@@ -884,6 +884,31 @@ td { padding: 16px 24px; vertical-align: middle; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+.profit-period-btn {
+  padding: 7px 14px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--bg2); color: var(--text2); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .2s; font-family: var(--sans);
+}
+.profit-period-btn.active {
+  background: var(--sf-grad); color: #fff; border-color: transparent;
+  box-shadow: 0 4px 12px var(--sf-shadow);
+}
+.profit-period-btn:hover:not(.active) { background: var(--bg3); }
+.profit-mkt-btn {
+  padding: 5px 12px; border-radius: 16px; border: 1px solid var(--border);
+  background: var(--bg2); color: var(--text3); font-size: 11px; font-weight: 700;
+  cursor: pointer; transition: all .2s; font-family: var(--mono);
+}
+.profit-mkt-btn.active { background: var(--seller-blue); color: #fff; border-color: var(--seller-blue); }
+.profit-row:hover { background: var(--bg2); }
+.profit-summary-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 16px; text-align: center;
+}
+.profit-summary-card .psc-label { font-size: 10px; color: var(--text3); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+.profit-summary-card .psc-val { font-size: 18px; font-weight: 800; color: var(--seller-green); font-family: var(--mono); }
+.profit-summary-card .psc-try { font-size: 13px; font-weight: 700; color: #dc2626; font-family: var(--mono); margin-top: 3px; }
 </style>
 </head>
 <body>
@@ -927,6 +952,9 @@ td { padding: 16px 24px; vertical-align: middle; }
         <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
         <path d="M8 16H3v5"/>
       </svg>
+    </button>
+    <button class="icon-btn" id="profit-tab-btn" onclick="toggleProfitPanel()" title="Kâr Raporu" style="position:relative;">
+      💰
     </button>
     <button class="icon-btn" id="settings-btn" onclick="openSettings()" title="Ayarlar">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -999,6 +1027,41 @@ td { padding: 16px 24px; vertical-align: middle; }
       <div class="cmd-mkt-tabs" id="cmd-mkt-tabs"></div>
       <div id="cmd-mkt-buttons" class="cmd-mkt-btn-grid"></div>
       <div class="cmd-result-bar" id="cmd-result-bar"></div>
+    </div>
+  </div>
+
+  <!-- Kâr Raporu Paneli -->
+  <div id="profit-panel" style="display:none;margin:0 16px 16px;background:var(--bg1);border-radius:20px;border:1px solid var(--border);box-shadow:0 4px 24px rgba(15,23,42,0.06);overflow:hidden;">
+    <div style="padding:20px 20px 0;">
+      <!-- Özet Kartlar -->
+      <div id="profit-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;"></div>
+      <!-- Dönem Filtreleri -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+        <button class="profit-period-btn active" onclick="setProfitPeriod('today',this)">Bugün</button>
+        <button class="profit-period-btn" onclick="setProfitPeriod('yesterday',this)">Dün</button>
+        <button class="profit-period-btn" onclick="setProfitPeriod('week',this)">Son 7 Gün</button>
+        <button class="profit-period-btn" onclick="setProfitPeriod('month',this)">Bu Ay</button>
+        <button class="profit-period-btn" onclick="setProfitPeriod('month30',this)">Son 30 Gün</button>
+        <button class="profit-period-btn" onclick="setProfitPeriod('all',this)">Tümü</button>
+      </div>
+      <!-- Mağaza Filtresi -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="profit-mkt-filter"></div>
+    </div>
+    <!-- Liste -->
+    <div id="profit-list" style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--bg2);border-bottom:1px solid var(--border);">
+            <th style="padding:10px 16px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">Sipariş No</th>
+            <th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">Mağaza</th>
+            <th style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">Tarih</th>
+            <th style="padding:10px 12px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">Kâr</th>
+            <th style="padding:10px 16px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;">₺ Karşılığı</th>
+          </tr>
+        </thead>
+        <tbody id="profit-tbody"></tbody>
+      </table>
+      <div id="profit-empty" style="display:none;text-align:center;padding:40px;color:var(--text3);font-size:14px;">Bu dönem için kâr verisi bulunamadı.</div>
     </div>
   </div>
 
@@ -1212,6 +1275,22 @@ async function fetchAllData() {
   }
   window._profitData = _profitData;
 
+  // Kâr Raporu için ham DB verilerini sakla
+  const _dbAllOrders = {};
+  for (const mktId of CFG.mkts) {
+    try {
+      const rawDb = await sbGet(`DB_${mktId}`);
+      const dbFull = rawDb ? ((typeof rawDb === 'object') ? rawDb : JSON.parse(rawDb)) : {};
+      for (const [sid, o] of Object.entries(dbFull)) {
+        if (o.finalProfit !== undefined && o.finalProfit !== null) {
+          const currency = ['78524','216116','87709'].includes(String(mktId)) ? 'AUD' : String(mktId) === '191308' ? 'GBP' : 'EUR';
+          _dbAllOrders[sid] = { ...o, sid, mktId, currency };
+        }
+      }
+    } catch(e) {}
+  }
+  window._dbAllOrders = _dbAllOrders;
+
   for (const mktId of CFG.mkts) {
     try {
       const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
@@ -1299,6 +1378,7 @@ async function fetchAllData() {
   renderOrders();
   updateTopStats();
   setConnState('ok');
+  if (_profitPanelOpen) renderProfitPanel();
 
   refreshModalIfOpen();
 }
@@ -1506,12 +1586,6 @@ function renderStores(storeNames) {
       <div class="sc"><div class="sc-num orange">${totalPending}</div><div class="sc-label">Bekleyen</div></div>
       <div class="sc"><div class="sc-num green">${totalDone}</div><div class="sc-label">Tamam</div></div>
       <div class="sc"><div class="sc-num gray">${totalAll}</div><div class="sc-label">Toplam</div></div>
-    </div>
-    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-      <div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Toplam Kâr</div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${allProfitHtml || '<span style="color:var(--text3)">—</span>'} <span style="font-weight:700;color:#dc2626;font-family:var(--mono);font-size:13px">${fmtTRY(allTotalTRY)}</span></div>
-      <div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-top:6px;margin-bottom:3px">Bugünkü Kâr</div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${allTodayHtml || '<span style="color:var(--text3)">—</span>'} <span style="font-weight:600;color:#dc2626;font-family:var(--mono);font-size:12px">${fmtTRY(allTodayTRY)}</span></div>
     </div>`;
 
   for (const mktId of CFG.mkts) {
@@ -1529,22 +1603,6 @@ function renderStores(storeNames) {
         <div class="sc"><div class="sc-num orange">${m.new}</div><div class="sc-label">Yeni</div></div>
         <div class="sc"><div class="sc-num blue">${m.active}</div><div class="sc-label">Aktif</div></div>
         <div class="sc"><div class="sc-num green">${m.done}</div><div class="sc-label">Tamam</div></div>
-      </div>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-          <span style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.8px">Toplam Kâr</span>
-          <span style="display:flex;gap:5px;align-items:center">
-            <span style="font-weight:700;color:var(--seller-green);font-family:var(--mono);font-size:12px">${profitStr}</span>
-            <span style="font-weight:700;color:#dc2626;font-family:var(--mono);font-size:12px">${fmtTRY(p.totalTRY||0)}</span>
-          </span>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.8px">Bugünkü Kâr</span>
-          <span style="display:flex;gap:5px;align-items:center">
-            <span style="font-weight:600;color:var(--green);font-family:var(--mono);font-size:12px">${todayStr}</span>
-            <span style="font-weight:600;color:#dc2626;font-family:var(--mono);font-size:12px">${fmtTRY(p.todayTotalTRY||0)}</span>
-          </span>
-        </div>
       </div>`;
     card.onclick = () => { _activeMkt = mktId; renderStores(storeNames); renderOrders(); };
     grid.appendChild(card);
@@ -2208,6 +2266,108 @@ async function triggerCmdAll(cmd, btn) {
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
+// ─── KÂR RAPORU ──────────────────────────────────────────────────────────────
+let _profitPeriod   = 'today';
+let _profitMktFilter = null; // null = tümü
+let _profitPanelOpen = false;
+
+function toggleProfitPanel() {
+  _profitPanelOpen = !_profitPanelOpen;
+  const panel = document.getElementById('profit-panel');
+  const btn   = document.getElementById('profit-tab-btn');
+  panel.style.display = _profitPanelOpen ? 'block' : 'none';
+  btn.style.background = _profitPanelOpen ? 'rgba(255,123,0,0.15)' : '';
+  btn.style.borderColor = _profitPanelOpen ? 'rgba(255,123,0,0.4)' : '';
+  if (_profitPanelOpen) renderProfitPanel();
+}
+
+function setProfitPeriod(period, btn) {
+  _profitPeriod = period;
+  document.querySelectorAll('.profit-period-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderProfitPanel();
+}
+
+function getProfitDateRange(period) {
+  const now = Date.now();
+  const d = new Date(); d.setHours(0,0,0,0);
+  if (period === 'today')     return [d.getTime(), now];
+  if (period === 'yesterday') { const y = new Date(d); y.setDate(y.getDate()-1); return [y.getTime(), d.getTime()]; }
+  if (period === 'week')      return [now - 7*86400000, now];
+  if (period === 'month')     { const m = new Date(d); m.setDate(1); return [m.getTime(), now]; }
+  if (period === 'month30')   return [now - 30*86400000, now];
+  return [0, now]; // all
+}
+
+function renderProfitPanel() {
+  const db = window._dbAllOrders || {};
+  const rates = window._fxRates || { EUR:1, GBP:1, AUD:1 };
+  const [from, to] = getProfitDateRange(_profitPeriod);
+  const fmtCur = (val, cur) => { const s = cur==='AUD'?'A$':cur==='GBP'?'£':'€'; return s+parseFloat(val).toFixed(2); };
+  const fmtTRY = v => '₺'+parseFloat(v).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtDate = ts => ts ? new Date(ts).toLocaleDateString('tr-TR',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+
+  // Mağaza filtre butonları
+  const mktFilterEl = document.getElementById('profit-mkt-filter');
+  const mktIds = [...new Set(Object.values(db).map(o => o.mktId))].filter(Boolean);
+  mktFilterEl.innerHTML = `<button class="profit-mkt-btn${_profitMktFilter===null?' active':''}" onclick="_profitMktFilter=null;renderProfitPanel()">Tümü</button>`
+    + mktIds.map(m => `<button class="profit-mkt-btn${_profitMktFilter===m?' active':''}" onclick="_profitMktFilter='${m}';renderProfitPanel()">${m}</button>`).join('');
+
+  // Filtrele
+  let rows = Object.values(db).filter(o => {
+    const t = o.orderDate || 0;
+    if (t < from || t > to) return false;
+    if (_profitMktFilter && o.mktId !== _profitMktFilter) return false;
+    return o.finalProfit !== null && o.finalProfit !== undefined;
+  });
+  rows.sort((a,b) => (b.orderDate||0) - (a.orderDate||0));
+
+  // Para birimi bazlı toplamlar
+  const totByCur = {}, tryTotal = {total:0};
+  for (const o of rows) {
+    const cur = o.currency || 'EUR';
+    const p = parseFloat(o.finalProfit) || 0;
+    totByCur[cur] = (totByCur[cur]||0) + p;
+    tryTotal.total += p * (rates[cur]||1);
+  }
+
+  // Özet kartlar
+  const summaryEl = document.getElementById('profit-summary-cards');
+  const summaryCards = [
+    { label: 'Sipariş Sayısı', val: rows.length, isTRY: false, isCount: true },
+    ...Object.entries(totByCur).map(([cur,val]) => ({ label: cur+' Kâr', val, cur, isTRY: false })),
+    { label: 'Toplam ₺', val: tryTotal.total, isTRY: true },
+  ];
+  summaryEl.innerHTML = summaryCards.map(c => `
+    <div class="profit-summary-card">
+      <div class="psc-label">${c.label}</div>
+      <div class="psc-val">${c.isCount ? c.val : c.isTRY ? fmtTRY(c.val) : fmtCur(c.val, c.cur)}</div>
+    </div>`).join('');
+
+  // Tablo
+  const tbody = document.getElementById('profit-tbody');
+  const emptyEl = document.getElementById('profit-empty');
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  tbody.innerHTML = rows.map(o => {
+    const cur = o.currency || 'EUR';
+    const p = parseFloat(o.finalProfit) || 0;
+    const tryVal = p * (rates[cur]||1);
+    const profitColor = p >= 0 ? 'var(--seller-green)' : 'var(--red)';
+    return `<tr class="profit-row" style="border-bottom:1px solid var(--border);cursor:default;">
+      <td style="padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--seller-blue)">${o.sid||'—'}</td>
+      <td style="padding:10px 12px;font-size:12px;color:var(--text2)">${o.mktId||'—'}</td>
+      <td style="padding:10px 12px;font-size:12px;color:var(--text3)">${fmtDate(o.orderDate)}</td>
+      <td style="padding:10px 12px;text-align:right;font-family:var(--mono);font-weight:700;color:${profitColor}">${fmtCur(p,cur)}</td>
+      <td style="padding:10px 16px;text-align:right;font-family:var(--mono);font-size:12px;color:#dc2626">${fmtTRY(tryVal)}</td>
+    </tr>`;
+  }).join('');
+}
+
 async function init() {
   document.getElementById('loading').style.display = 'block';
   await refreshAll();
