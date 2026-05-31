@@ -1198,7 +1198,7 @@ async function fetchStoreName(mktId) {
     if (!raw) return `Mağaza ${mktId}`;
     const accounts = (typeof raw === 'object') ? raw : JSON.parse(raw);
     const account = Array.isArray(accounts)
-      ? accounts.find(a => String(a.id) === String(mktId) || String(a.marketPlaceId) === String(mktId))
+      ? accounts.find(a => String(a.id) === String(mktId) || String(a.marketPlaceId) === String(mktId) || String(a.marketplaceId) === String(mktId))
       : null;
     return account?.storeName || account?.name || `Mağaza ${mktId}`;
   } catch(e) { return `Mağaza ${mktId}`; }
