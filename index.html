@@ -1281,7 +1281,7 @@ async function fetchAllData() {
       for (const [sid, o] of Object.entries(dbFull)) {
         if (o.finalProfit !== undefined && o.finalProfit !== null) {
           const currency = ['78524','216116','87709'].includes(String(mktId)) ? 'AUD' : String(mktId) === '191308' ? 'GBP' : 'EUR';
-          _dbAllOrders[sid] = { ...o, sid, mktId, currency };
+          _dbAllOrders[sid] = { ...o, sid, mktId, currency, storeName: storeNames[mktId] || String(mktId) };
         }
       }
     } catch(e) {}
@@ -2313,7 +2313,7 @@ function renderProfitPanel() {
   const mktFilterEl = document.getElementById('profit-mkt-filter');
   const mktIds = [...new Set(Object.values(db).map(o => o.mktId))].filter(Boolean);
   mktFilterEl.innerHTML = `<button class="profit-mkt-btn${_profitMktFilter===null?' active':''}" onclick="_profitMktFilter=null;renderProfitPanel()">Tümü</button>`
-    + mktIds.map(m => `<button class="profit-mkt-btn${_profitMktFilter===m?' active':''}" onclick="_profitMktFilter='${m}';renderProfitPanel()">${m}</button>`).join('');
+    + mktIds.map(m => { const sn = (window._dbAllOrders && Object.values(window._dbAllOrders).find(o=>o.mktId===m)?.storeName) || m; return `<button class="profit-mkt-btn${_profitMktFilter===m?' active':''}" onclick="_profitMktFilter='${m}';renderProfitPanel()">${sn}</button>`; }).join('');
 
   // Filtrele
   let rows = Object.values(db).filter(o => {
@@ -2364,7 +2364,7 @@ function renderProfitPanel() {
     return `<div style="display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid var(--border);background:${bg};">
       <div>
         <div style="font-family:var(--mono);font-size:11px;color:var(--seller-blue);line-height:1.3;">${o.sid||'—'}</div>
-        <div style="font-size:10px;color:var(--text3);margin-top:1px;">${o.mktId||'—'} · ${fmtDate(o.orderDate)}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:1px;">${o.storeName||o.mktId||'—'} · ${fmtDate(o.orderDate)}</div>
       </div>
       <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${profitColor};text-align:right;white-space:nowrap;">${fmtCur(p,cur)}</div>
       <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:#dc2626;text-align:right;white-space:nowrap;">${fmtTRY(tryVal)}</div>
