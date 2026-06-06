@@ -2316,12 +2316,14 @@ function renderProfitPanel() {
     + mktIds.map(m => { const sn = (window._dbAllOrders && Object.values(window._dbAllOrders).find(o=>o.mktId===m)?.storeName) || m; return `<button class="profit-mkt-btn${_profitMktFilter===m?' active':''}" onclick="_profitMktFilter='${m}';renderProfitPanel()">${sn}</button>`; }).join('');
 
   // Filtrele
-  let rows = Object.values(db).filter(o => {
-    const t = o.orderDate || 0;
-    if (t < from || t > to) return false;
-    if (_profitMktFilter && o.mktId !== _profitMktFilter) return false;
-    return o.finalProfit !== null && o.finalProfit !== undefined;
-  });
+  // YENİ
+let rows = Object.values(db).filter(o => {
+  const t = o.orderDate || 0;
+  if (t < from || t > to) return false;
+  if (_profitMktFilter && o.mktId !== _profitMktFilter) return false;
+  if (o.sfStatus === 2) return false;          // ← İptal siparişleri hariç tut
+  return o.finalProfit !== null && o.finalProfit !== undefined;
+});
   rows.sort((a,b) => (b.orderDate||0) - (a.orderDate||0));
 
   // Para birimi bazlı toplamlar
