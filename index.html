@@ -2321,8 +2321,8 @@ function _buildTrackUrl(carrier, num, existing) {
   if (existing) return existing;
   if (!num) return '';
   const c = (carrier || '').toLowerCase();
-  if (c.includes('dhl'))                                    return `https://www.dhl.com/en/express/tracking.html?AWB=${num}`;
-  if (c.includes('asendia'))                                return `https://tracking.asendia.com/tracking/${num}`;
+  if (c.includes('dhl'))                                    return `https://www.dhl.com/us-en/home/tracking.html?tracking-id=${num}&submit=1`;
+  if (c.includes('asendia'))                                return `https://a1.asendiausa.com/tracking/?trackingnumber=${num}`;
   if (c.includes('fedex'))                                  return `https://www.fedex.com/fedextrack/?trknbr=${num}`;
   if (c.includes('ups'))                                    return `https://www.ups.com/track?tracknum=${num}`;
   if (c.includes('apc') || c.includes('evri') || c.includes('hermes')) return `https://www.evri.com/track/parcel/${num}`;
