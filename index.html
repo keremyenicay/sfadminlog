@@ -2317,11 +2317,25 @@ function _fmtDate(ts) {
   if (!ts) return '';
   try { return new Date(ts).toLocaleDateString('tr-TR'); } catch (e) { return ''; }
 }
+function _buildTrackUrl(carrier, num, existing) {
+  if (existing) return existing;
+  if (!num) return '';
+  const c = (carrier || '').toLowerCase();
+  if (c.includes('dhl'))                                    return `https://www.dhl.com/en/express/tracking.html?AWB=${num}`;
+  if (c.includes('asendia'))                                return `https://tracking.asendia.com/tracking/${num}`;
+  if (c.includes('fedex'))                                  return `https://www.fedex.com/fedextrack/?trknbr=${num}`;
+  if (c.includes('ups'))                                    return `https://www.ups.com/track?tracknum=${num}`;
+  if (c.includes('apc') || c.includes('evri') || c.includes('hermes')) return `https://www.evri.com/track/parcel/${num}`;
+  if (c.includes('epost') || c.includes('epg') || String(num).toUpperCase().startsWith('EPG')) return `https://portal.epgshipping.com/ParcelTracker/HomePageTracker`;
+  return `https://parcelsapp.com/en/tracking/${num}`;
+}
+
 function _orderBox(r) {
   const price = (r.price != null && r.price !== '') ? `${r.price} ${_msgEsc(r.currency || '')}` : '';
   const deliv = r.deliveryEndDate ? `🗓 Teslim sözü: ${_fmtDate(r.deliveryEndDate)}` : '';
+  const trackUrl = _buildTrackUrl(r.cargoCompany, r.whTracking, r.trackingUrl);
   const cargoLine = r.cargoCompany || r.whTracking
-    ? `🚚 ${_msgEsc(r.cargoCompany || '-')}${r.whTracking ? ' · <code style="font-size:11px;">'+_msgEsc(r.whTracking)+'</code>' : ''}${r.trackingUrl ? ` · <a href="${_msgEsc(r.trackingUrl)}" target="_blank" rel="noopener" style="color:#2563eb;">Takip ↗</a>` : ''}`
+    ? `🚚 ${_msgEsc(r.cargoCompany || '-')}${r.whTracking ? ' · <code style="font-size:11px;">'+_msgEsc(r.whTracking)+'</code>' : ''}${trackUrl ? ` · <a href="${_msgEsc(trackUrl)}" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600;">Takip ↗</a>` : ''}`
     : '';
   const statusLine = r.cargoStatus
     ? `📍 ${_msgEsc(r.cargoStatus)}`
@@ -2389,6 +2403,32 @@ function refreshMsgBadge() {
   badge.style.display = n > 0 ? 'block' : 'none';
 }
 
+// Hazır Türkçe şablonlar (kutu Türkçe; gönderirken müşteri diline çevrilir)
+const REPLY_TEMPLATES = {
+  refund_ok:    { label: '💸 Para iadesi onayı', text: 'Merhaba, yaşadığınız sorun için çok üzgünüz. Siparişinizin tam iadesini başlattık; tutar 3-5 iş günü içinde ödeme yönteminize yansıyacaktır. Anlayışınız için teşekkür ederiz.' },
+  refund_review:{ label: '🔎 İade incelemede', text: 'Merhaba, talebinizi aldık ve ekibimiz en kısa sürede inceliyor. Konuyla ilgili size dönüş yapacağız. İlginiz için teşekkür ederiz.' },
+  replacement:  { label: '🔁 Yeniden gönderim', text: 'Merhaba, sorunu çözmek için ürünün yenisini ücretsiz olarak göndereceğiz. Kargo bilgisi hazır olunca sizi bilgilendireceğiz. Yaşattığımız rahatsızlık için özür dileriz.' },
+  delay:        { label: '⏰ Kargo gecikmesi', text: 'Merhaba, gönderinizdeki gecikme için özür dileriz. Kargonuz yolda; takip durumunu kontrol edip en güncel bilgiyi sizinle paylaşacağız. Sabrınız için teşekkürler.' },
+  delivered:    { label: '📦 Teslim göründü', text: 'Merhaba, kayıtlarımızda paketiniz teslim edilmiş görünüyor. Çevrenizi ve komşularınızı kontrol etmenizi rica ederiz. Paketi bulamazsanız, çözüm için size yardımcı olmaya devam edeceğiz.' },
+  address:      { label: '🏠 Adres teyidi', text: 'Merhaba, gönderimden önce teslimat adresinizi teyit edebilir misiniz? Doğru adresle siparişinizi en kısa sürede yola çıkaralım.' },
+  thanks:       { label: '🙏 Teşekkür', text: 'Geri bildiriminiz için çok teşekkür ederiz! Memnun kaldığınızı duymak bizi mutlu etti. Sağlıklı günler dileriz.' },
+};
+
+const _msgOpenIds = new Set();
+function toggleMsgCard(mktId, id) {
+  const key = mktId + ':' + id;
+  const body = document.getElementById(`msg-body-${mktId}-${id}`);
+  const car  = document.getElementById(`msg-caret-${mktId}-${id}`);
+  if (_msgOpenIds.has(key)) { _msgOpenIds.delete(key); if (body) body.style.display = 'none'; if (car) car.textContent = '▶'; }
+  else { _msgOpenIds.add(key); if (body) body.style.display = 'block'; if (car) car.textContent = '▼'; }
+}
+function useTemplate(mktId, id, key) {
+  const t = REPLY_TEMPLATES[key];
+  if (!t) return;
+  const ta = document.getElementById(`msg-ta-${mktId}-${id}`);
+  if (ta) { ta.value = t.text; _sendStale(mktId, id); ta.focus(); }
+}
+
 function renderMsgPanel() {
   const list = document.getElementById('msg-list');
   const empty = document.getElementById('msg-empty');
@@ -2436,19 +2476,30 @@ function renderMsgPanel() {
     const taId = `msg-ta-${r.mktId}-${r.id}`;
     const meta = INTENT_META[r.intent] || INTENT_META.other;
     const conf = Math.round((r.confidence || 0) * 100);
+    const open = _msgOpenIds.has(r.mktId + ':' + r.id);
     const statusBadge = sent ? `<span style="font-size:11px;color:#16a34a;font-weight:700;">✅ Gönderildi</span>`
                        : ignored ? `<span style="font-size:11px;color:#94a3b8;font-weight:700;">Yoksayıldı</span>`
                        : analyzed ? `<span style="display:inline-block;background:${meta.color}1a;color:${meta.color};font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;">${meta.emoji} ${meta.tr}</span><span style="font-size:11px;color:var(--text3);margin-left:6px;">%${conf}</span>`
-                       : '';
+                       : `<span style="font-size:11px;color:#7c3aed;font-weight:700;">AI bekliyor</span>`;
+    const snippet = ((r.originalTr || r.original || '').replace(/\s+/g, ' ').slice(0, 70)) + ((r.originalTr || r.original || '').length > 70 ? '…' : '');
+    const templateChips = Object.entries(REPLY_TEMPLATES).map(([k, t]) =>
+      `<button class="cmd-btn" style="background:var(--bg2);color:var(--text2);padding:3px 8px;font-size:11px;" onclick="useTemplate('${r.mktId}','${r.id}','${k}')">${t.label}</button>`).join('');
+
     return `
-    <div style="background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 10px rgba(15,23,42,0.05);">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
-        <div>
-          <span style="font-size:13px;font-weight:700;color:var(--text);">${_msgEsc(r.customerName)}</span>
-          <div style="font-size:11px;color:var(--text3);">${_msgEsc(r.amazonOrderId || r.sellerOrderId || '')} · Mağaza ${_msgEsc(r.mktId)} ${r.countryCode ? '· '+_msgEsc(r.countryCode) : ''}</div>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:14px;margin-bottom:10px;box-shadow:0 2px 10px rgba(15,23,42,0.04);overflow:hidden;">
+      <div onclick="toggleMsgCard('${r.mktId}','${r.id}')" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:12px 14px;cursor:pointer;">
+        <div style="display:flex;gap:8px;min-width:0;">
+          <span id="msg-caret-${r.mktId}-${r.id}" style="font-size:12px;color:var(--text3);margin-top:2px;">${open ? '▼' : '▶'}</span>
+          <div style="min-width:0;">
+            <span style="font-size:13px;font-weight:700;color:var(--text);">${_msgEsc(r.customerName)}</span>
+            <div style="font-size:11px;color:var(--text3);">${_msgEsc(r.amazonOrderId || r.sellerOrderId || '')} · ${_msgEsc(r.mktId)} ${r.countryCode ? '· '+_msgEsc(r.countryCode) : ''}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62vw;">${_msgEsc(snippet)}</div>
+          </div>
         </div>
-        <div style="text-align:right;">${statusBadge}${_ageBadge(r) ? '<div style="margin-top:3px;">'+_ageBadge(r)+'</div>' : ''}</div>
+        <div style="text-align:right;flex-shrink:0;">${statusBadge}${_ageBadge(r) ? '<div style="margin-top:3px;">'+_ageBadge(r)+'</div>' : ''}</div>
       </div>
+
+      <div id="msg-body-${r.mktId}-${r.id}" style="display:${open ? 'block' : 'none'};padding:0 14px 14px;">
       ${_orderBox(r)}
       ${analyzed && r.summary ? `<div style="font-size:12px;color:var(--text2);font-style:italic;margin-bottom:8px;">🧠 ${_msgEsc(r.summary)}</div>` : ''}
       <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">MÜŞTERİ MESAJI ${r.countryCode ? '('+_msgEsc(r.countryCode)+')' : ''}</div>
@@ -2461,7 +2512,8 @@ function renderMsgPanel() {
           <button class="cmd-btn" style="background:#7c3aed;color:#fff;" onclick="analyzeMsg('${r.mktId}','${r.id}',this)">🧠 AI Öneri Hazırla</button>
           <button class="cmd-btn" style="background:var(--bg2);color:var(--text2);" onclick="ignoreMsg('${r.mktId}','${r.id}',this)">Yoksay</button>
         </div>` : `
-        ${r.trackingInfo ? `<div style="font-size:12px;color:#2563eb;margin-bottom:8px;">📍 Canlı kargo: ${_msgEsc(r.trackingInfo)}</div>` : ''}
+        <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">⚡ HAZIR ŞABLONLAR</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">${templateChips}</div>
         <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">✍️ YANITINI TÜRKÇE YAZ (gönderilirken ${r.language ? _msgEsc(r.language) : 'müşteri'} diline çevrilir)</div>
         <textarea id="${taId}" oninput="_sendStale('${r.mktId}','${r.id}')" style="width:100%;min-height:90px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;background:#fff;">${_msgEsc(r.draftTr || '')}</textarea>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
@@ -2474,6 +2526,7 @@ function renderMsgPanel() {
           <button class="cmd-btn" style="background:var(--bg2);color:var(--text2);" onclick="analyzeMsg('${r.mktId}','${r.id}',this)">🔁 Yeniden</button>
           <button class="cmd-btn" style="background:var(--bg2);color:var(--text2);" onclick="ignoreMsg('${r.mktId}','${r.id}',this)">Yoksay</button>
         </div>`)}
+      </div>
     </div>`;
   }).join('');
 }
@@ -2513,6 +2566,7 @@ async function analyzeMsg(mktId, id, btn) {
     const data = await res.json();
     if (data.ok && data.message) {
       _msgQueues[mktId][id] = data.message;
+      _msgOpenIds.add(mktId + ':' + id);
       showCmdResult('AI önerisi hazır');
       renderMsgPanel();
     } else {
