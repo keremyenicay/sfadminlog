@@ -2333,7 +2333,7 @@ function _buildTrackUrl(carrier, num, existing) {
 function _orderBox(r) {
   const price = (r.price != null && r.price !== '') ? `${r.price} ${_msgEsc(r.currency || '')}` : '';
   const deliv = r.deliveryEndDate ? `🗓 Teslim sözü: ${_fmtDate(r.deliveryEndDate)}` : '';
-  const trackUrl = _buildTrackUrl(r.cargoCompany, r.whTracking, r.trackingUrl);
+  const trackUrl = _buildTrackUrl(r.cargoCompany, r.whTracking);
   const cargoLine = r.cargoCompany || r.whTracking
     ? `🚚 ${_msgEsc(r.cargoCompany || '-')}${r.whTracking ? ' · <code style="font-size:11px;">'+_msgEsc(r.whTracking)+'</code>' : ''}${trackUrl ? ` · <a href="${_msgEsc(trackUrl)}" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600;">Takip ↗</a>` : ''}`
     : '';
@@ -2429,6 +2429,28 @@ function useTemplate(mktId, id, key) {
   if (ta) { ta.value = t.text; _sendStale(mktId, id); ta.focus(); }
 }
 
+const SENTIMENT_TR = { angry: '😠 Öfkeli', frustrated: '😟 Bıkkın', neutral: '😐 Nötr', positive: '😊 Olumlu' };
+const RISK_META = { high: { tr: 'Yüksek risk', c: '#dc2626' }, medium: { tr: 'Orta risk', c: '#d97706' }, low: { tr: 'Düşük risk', c: '#16a34a' } };
+
+function _analysisBox(r) {
+  if (!r.analyzed) return '';
+  const risk = RISK_META[r.riskLevel] || null;
+  const sent = SENTIMENT_TR[r.sentiment] || '';
+  const badges = [];
+  if (risk) badges.push(`<span style="background:${risk.c}1a;color:${risk.c};font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;">⚠ ${risk.tr}</span>`);
+  if (sent) badges.push(`<span style="font-size:11px;color:var(--text3);">${sent}</span>`);
+  const issues = (r.reviewIssues && r.reviewIssues.length)
+    ? `<div style="font-size:11px;color:#b45309;background:#fff8e6;border:1px solid #f0e0b0;border-radius:8px;padding:6px 8px;margin-top:6px;">⚠️ Denetim notu: ${_msgEsc(r.reviewIssues.join(' · '))}</div>` : '';
+  if (!badges.length && !r.diagnosis && !r.recommendedAction && !issues) return '';
+  return `
+    <div style="background:#faf9ff;border:1px solid #e6e1f7;border-radius:10px;padding:8px 10px;margin-bottom:8px;">
+      ${badges.length ? `<div style="display:flex;gap:8px;align-items:center;margin-bottom:${r.diagnosis||r.recommendedAction?'6px':'0'};">${badges.join('')}</div>` : ''}
+      ${r.diagnosis ? `<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">🩺 <b>Teşhis:</b> ${_msgEsc(r.diagnosis)}</div>` : ''}
+      ${r.recommendedAction ? `<div style="font-size:12px;color:var(--text);"><b>🎯 Önerilen:</b> ${_msgEsc(r.recommendedAction)}${r.actionReason ? ` <span style="color:var(--text3);">— ${_msgEsc(r.actionReason)}</span>` : ''}</div>` : ''}
+      ${issues}
+    </div>`;
+}
+
 function renderMsgPanel() {
   const list = document.getElementById('msg-list');
   const empty = document.getElementById('msg-empty');
@@ -2491,7 +2513,7 @@ function renderMsgPanel() {
         <div style="display:flex;gap:8px;min-width:0;">
           <span id="msg-caret-${r.mktId}-${r.id}" style="font-size:12px;color:var(--text3);margin-top:2px;">${open ? '▼' : '▶'}</span>
           <div style="min-width:0;">
-            <span style="font-size:13px;font-weight:700;color:var(--text);">${_msgEsc(r.customerName)}</span>
+            <span style="font-size:13px;font-weight:700;color:var(--text);">${analyzed && r.riskLevel === 'high' ? '🔴 ' : ''}${_msgEsc(r.customerName)}</span>
             <div style="font-size:11px;color:var(--text3);">${_msgEsc(r.amazonOrderId || r.sellerOrderId || '')} · ${_msgEsc(r.mktId)} ${r.countryCode ? '· '+_msgEsc(r.countryCode) : ''}</div>
             <div style="font-size:12px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62vw;">${_msgEsc(snippet)}</div>
           </div>
@@ -2502,6 +2524,7 @@ function renderMsgPanel() {
       <div id="msg-body-${r.mktId}-${r.id}" style="display:${open ? 'block' : 'none'};padding:0 14px 14px;">
       ${_orderBox(r)}
       ${analyzed && r.summary ? `<div style="font-size:12px;color:var(--text2);font-style:italic;margin-bottom:8px;">🧠 ${_msgEsc(r.summary)}</div>` : ''}
+      ${_analysisBox(r)}
       <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">MÜŞTERİ MESAJI ${r.countryCode ? '('+_msgEsc(r.countryCode)+')' : ''}</div>
       <div style="background:var(--bg2);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text);white-space:pre-wrap;margin-bottom:6px;border:1px solid var(--border);">${_msgEsc(r.original)}</div>
       ${r.originalTr ? `<div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">🇹🇷 MÜŞTERİ MESAJI (TÜRKÇE)</div><div style="background:#eef4ff;border:1px solid #cdddf7;border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text2);white-space:pre-wrap;margin-bottom:8px;">${_msgEsc(r.originalTr)}</div>` : ''}
