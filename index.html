@@ -2371,36 +2371,50 @@ function renderMsgPanel() {
   empty.style.display = 'none';
 
   list.innerHTML = rows.map(r => {
-    const meta = INTENT_META[r.intent] || INTENT_META.other;
-    const conf = Math.round((r.confidence || 0) * 100);
     const sent = r.status === 'sent';
     const ignored = r.status === 'ignored';
     const disabled = sent || ignored;
+    const analyzed = !!r.analyzed;
     const taId = `msg-ta-${r.mktId}-${r.id}`;
+    const meta = INTENT_META[r.intent] || INTENT_META.other;
+    const conf = Math.round((r.confidence || 0) * 100);
     const statusBadge = sent ? `<span style="font-size:11px;color:#16a34a;font-weight:700;">✅ Gönderildi</span>`
-                       : ignored ? `<span style="font-size:11px;color:#94a3b8;font-weight:700;">Yoksayıldı</span>` : '';
+                       : ignored ? `<span style="font-size:11px;color:#94a3b8;font-weight:700;">Yoksayıldı</span>`
+                       : analyzed ? `<span style="display:inline-block;background:${meta.color}1a;color:${meta.color};font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;">${meta.emoji} ${meta.tr}</span><span style="font-size:11px;color:var(--text3);margin-left:6px;">%${conf}</span>`
+                       : '';
     return `
     <div style="background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 10px rgba(15,23,42,0.05);">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
         <div>
-          <span style="display:inline-block;background:${meta.color}1a;color:${meta.color};font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;">${meta.emoji} ${meta.tr}</span>
-          <span style="font-size:11px;color:var(--text3);margin-left:6px;">%${conf} güven</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text);">${_msgEsc(r.customerName)}</span>
+          <div style="font-size:11px;color:var(--text3);">${_msgEsc(r.amazonOrderId || r.sellerOrderId || '')} · Mağaza ${_msgEsc(r.mktId)} ${r.countryCode ? '· '+_msgEsc(r.countryCode) : ''}</div>
         </div>
         <div style="text-align:right;">${statusBadge}</div>
       </div>
-      <div style="font-size:13px;font-weight:700;color:var(--text);">${_msgEsc(r.customerName)}</div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">${_msgEsc(r.amazonOrderId || r.sellerOrderId || '')} · Mağaza ${_msgEsc(r.mktId)}</div>
-      ${r.summary ? `<div style="font-size:12px;color:var(--text2);font-style:italic;margin-bottom:8px;">🧠 ${_msgEsc(r.summary)}</div>` : ''}
-      <div style="background:var(--bg2);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text);white-space:pre-wrap;margin-bottom:8px;border:1px solid var(--border);">${_msgEsc(r.original)}</div>
+      ${analyzed && r.summary ? `<div style="font-size:12px;color:var(--text2);font-style:italic;margin-bottom:8px;">🧠 ${_msgEsc(r.summary)}</div>` : ''}
+      <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">MÜŞTERİ MESAJI ${r.countryCode ? '('+_msgEsc(r.countryCode)+')' : ''}</div>
+      <div style="background:var(--bg2);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text);white-space:pre-wrap;margin-bottom:6px;border:1px solid var(--border);">${_msgEsc(r.original)}</div>
+      ${r.originalTr ? `<div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">🇹🇷 MÜŞTERİ MESAJI (TÜRKÇE)</div><div style="background:#eef4ff;border:1px solid #cdddf7;border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text2);white-space:pre-wrap;margin-bottom:8px;">${_msgEsc(r.originalTr)}</div>` : ''}
       ${r.transcript && (r.transcript.match(/\n/g)||[]).length > 0 ? `<details style="margin-bottom:8px;"><summary style="font-size:11px;color:var(--text3);cursor:pointer;">🧵 Konuşma geçmişi</summary><div style="font-size:12px;color:var(--text2);white-space:pre-wrap;margin-top:6px;padding:8px 10px;background:var(--bg2);border-radius:8px;border:1px solid var(--border);">${_msgEsc(r.transcript)}</div></details>` : ''}
-      ${r.trackingInfo ? `<div style="font-size:12px;color:#2563eb;margin-bottom:8px;">📍 Canlı kargo: ${_msgEsc(r.trackingInfo)}</div>` : ''}
-      <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">YANIT TASLAĞI ${r.language ? '('+_msgEsc(r.language)+')' : ''}</div>
-      <textarea id="${taId}" ${disabled?'disabled':''} style="width:100%;min-height:90px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;background:${disabled?'var(--bg2)':'#fff'};">${_msgEsc(sent && r.sentText ? r.sentText : r.draft)}</textarea>
-      ${disabled ? '' : `
-      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-        <button class="cmd-btn" style="background:#16a34a;color:#fff;" onclick="sendMsg('${r.mktId}','${r.id}',this)">✅ Onayla &amp; Gönder</button>
-        <button class="cmd-btn" style="background:var(--bg2);color:var(--text2);" onclick="ignoreMsg('${r.mktId}','${r.id}',this)">Yoksay</button>
-      </div>`}
+      ${disabled ? (sent ? `<div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">GÖNDERİLEN YANIT ${r.language ? '('+_msgEsc(r.language)+')' : ''}</div><div style="background:var(--bg2);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text2);white-space:pre-wrap;border:1px solid var(--border);">${_msgEsc(r.sentText || '')}</div>${r.sentSourceTr ? `<div style="font-size:11px;color:var(--text3);margin-top:4px;">🇹🇷 Senin yazdığın: ${_msgEsc(r.sentSourceTr)}</div>` : ''}` : '') :
+        (!analyzed ? `
+        <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;">
+          <button class="cmd-btn" style="background:#7c3aed;color:#fff;" onclick="analyzeMsg('${r.mktId}','${r.id}',this)">🧠 AI Öneri Hazırla</button>
+          <button class="cmd-btn" style="background:var(--bg2);color:var(--text2);" onclick="ignoreMsg('${r.mktId}','${r.id}',this)">Yoksay</button>
+        </div>` : `
+        ${r.trackingInfo ? `<div style="font-size:12px;color:#2563eb;margin-bottom:8px;">📍 Canlı kargo: ${_msgEsc(r.trackingInfo)}</div>` : ''}
+        <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">✍️ YANITINI TÜRKÇE YAZ (gönderilirken ${r.language ? _msgEsc(r.language) : 'müşteri'} diline çevrilir)</div>
+        <textarea id="${taId}" oninput="_sendStale('${r.mktId}','${r.id}')" style="width:100%;min-height:90px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;background:#fff;">${_msgEsc(r.draftTr || '')}</textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+          <span style="font-size:11px;color:var(--text3);font-weight:700;">📤 MÜŞTERİYE GİDECEK HALİ ${r.language ? '('+_msgEsc(r.language)+')' : ''}</span>
+          <button class="cmd-btn" style="background:var(--bg2);color:var(--text2);padding:2px 8px;font-size:11px;" onclick="refreshSend('${r.mktId}','${r.id}',this)">🔁 Çevir</button>
+        </div>
+        <div id="msg-send-${r.mktId}-${r.id}" style="font-size:12px;color:var(--text2);white-space:pre-wrap;background:#f3fbf4;border:1px solid #c7e9cc;border-radius:8px;padding:8px 10px;margin-top:4px;">${_msgEsc(r.draft || 'Çevir butonuna basınca müşteriye gidecek metni gösterir.')}</div>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <button class="cmd-btn" style="background:#16a34a;color:#fff;" onclick="sendMsg('${r.mktId}','${r.id}',this)">✅ Onayla &amp; Gönder</button>
+          <button class="cmd-btn" style="background:var(--bg2);color:var(--text2);" onclick="analyzeMsg('${r.mktId}','${r.id}',this)">🔁 Yeniden</button>
+          <button class="cmd-btn" style="background:var(--bg2);color:var(--text2);" onclick="ignoreMsg('${r.mktId}','${r.id}',this)">Yoksay</button>
+        </div>`)}
     </div>`;
   }).join('');
 }
@@ -2429,11 +2443,61 @@ async function scanMessages(btn) {
   renderMsgPanel();
 }
 
+async function analyzeMsg(mktId, id, btn) {
+  if (btn) { btn.classList.add('loading'); btn.textContent = '⏳ Hazırlanıyor...'; }
+  const serverUrl = getServerUrl();
+  try {
+    const res = await fetch(`${serverUrl}/messages/analyze`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mktId, messageId: id })
+    });
+    const data = await res.json();
+    if (data.ok && data.message) {
+      _msgQueues[mktId][id] = data.message;
+      showCmdResult('AI önerisi hazır');
+      renderMsgPanel();
+    } else {
+      showCmdResult(data.error || 'AI hatası', false);
+      if (btn) { btn.classList.remove('loading'); btn.textContent = '🧠 AI Öneri Hazırla'; }
+    }
+  } catch (e) {
+    showCmdResult(`Bağlantı hatası: ${e.message}`, false);
+    if (btn) { btn.classList.remove('loading'); btn.textContent = '🧠 AI Öneri Hazırla'; }
+  }
+}
+
+function _sendStale(mktId, id) {
+  const box = document.getElementById(`msg-send-${mktId}-${id}`);
+  if (box) box.style.opacity = '0.5';
+}
+
+async function refreshSend(mktId, id, btn) {
+  const ta = document.getElementById(`msg-ta-${mktId}-${id}`);
+  const box = document.getElementById(`msg-send-${mktId}-${id}`);
+  const text = ta ? ta.value.trim() : '';
+  if (!text) { if (box){ box.textContent='(boş)'; box.style.opacity='1'; } return; }
+  if (btn) btn.classList.add('loading');
+  if (box) box.textContent = 'Çevriliyor...';
+  const serverUrl = getServerUrl();
+  try {
+    const res = await fetch(`${serverUrl}/messages/preview-send`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mktId, messageId: id, text })
+    });
+    const data = await res.json();
+    if (box) { box.textContent = data.text || '(çeviri alınamadı)'; box.style.opacity = '1'; }
+  } catch (e) {
+    if (box) { box.textContent = `Hata: ${e.message}`; box.style.opacity = '1'; }
+  }
+  if (btn) btn.classList.remove('loading');
+}
+
 async function sendMsg(mktId, id, btn) {
   const ta = document.getElementById(`msg-ta-${mktId}-${id}`);
   const text = ta ? ta.value.trim() : '';
   if (!text) { showCmdResult('Mesaj boş olamaz', false); return; }
-  if (!confirm('Bu mesaj müşteriye gönderilecek. Onaylıyor musun?')) return;
+  const lang = (_msgQueues[mktId] && _msgQueues[mktId][id] && _msgQueues[mktId][id].language) || '';
+  if (!confirm(`Yazdığın Türkçe yanıt ${lang ? lang+' diline çevrilip ' : ''}müşteriye gönderilecek. Onaylıyor musun?`)) return;
   if (btn) btn.classList.add('loading');
   const serverUrl = getServerUrl();
   try {
@@ -2446,7 +2510,8 @@ async function sendMsg(mktId, id, btn) {
       showCmdResult('Mesaj gönderildi ✅');
       if (_msgQueues[mktId] && _msgQueues[mktId][id]) {
         _msgQueues[mktId][id].status = 'sent';
-        _msgQueues[mktId][id].sentText = text;
+        _msgQueues[mktId][id].sentText = data.sentText || text;
+        _msgQueues[mktId][id].sentSourceTr = text;
       }
       refreshMsgBadge(); renderMsgPanel();
     } else {
