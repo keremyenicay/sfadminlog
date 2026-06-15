@@ -2637,27 +2637,46 @@ async function openWarehouse(mktId, id, btn) {
         const isWhatsAppDepo = whName.includes('PREPLARGE') || whName.includes('COMFYSHIP') || whName.includes('FULLFILLONUS') || whId.startsWith('CS-') || whId.startsWith('DRP-') || whId.startsWith('LMG-');
         
         // WhatsApp Numaraları (Boş ise grup linki gibi davranır)
-        const WH_CONTACTS = { 'PREPLARGE': '905301234567', 'COMFYSHIP': '', 'FULLFILLONUS': '' };
-        const targetPhone = Object.keys(WH_CONTACTS).find(k => whName.includes(k)) ? WH_CONTACTS[Object.keys(WH_CONTACTS).find(k => whName.includes(k))] : null;
+        // Depo kimliğine göre WhatsApp hedefini belirle
+// warehouseId prefix'i: CS- → COMFYSHIP, DRP- → PREPLARGE, LMG- → FULLFILLONUS/SHIPPINGLOT
+const WH_CONTACTS = {
+    // Telefon numarası varsa: 'wa.me/90XXXXXXXXXX' formatında
+    // Grup linki varsa: 'chat.whatsapp.com/XXXXXX' formatında
+    // İkisi de yoksa: boş → kopyala
+    'PREPLARGE':    { phone: 'wa.me/905516293724',    group: '' },
+    'COMFYSHIP':    { phone: '',  group: '' },
+    'FULLFILLONUS': { phone: '',  group: '' },
+};
 
-        const head = `<div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px;">🏭 ${_msgEsc(d.warehouseName || 'Depo')} · ID: ${whId}</div>`;
+// warehouseId prefix'inden de eşle (CS- / DRP- / LMG-)
+const WH_ID_MAP = { 'CS-': 'COMFYSHIP', 'DRP-': 'PREPLARGE', 'LMG-': 'FULLFILLONUS' };
 
-        // --- EĞER WHATSAPP DEPOSU İSE ---
-        if (isWhatsAppDepo) {
-            // Mesajı hazırlarken warehouseId'yi başa koy ve iade işlerini senin yaptığını vurgula
-            const msg = d.aiDraft || `*Sipariş: ${whId}*\n\nMerhaba, bu siparişin kargo durumu hakkında bilgi alabilir miyim? Müşteri kargo hakkında bilgi bekliyor. (İade ve etiket işlemleri tarafımdan yürütülmektedir, siz sadece ürün/kargo durumunu kontrol edebilirsiniz.)`;
-            const encodedMsg = encodeURIComponent(msg);
+const depoKey = Object.keys(WH_CONTACTS).find(k => whName.includes(k))
+    || WH_ID_MAP[Object.keys(WH_ID_MAP).find(p => whId.startsWith(p)) || ''];
 
-            box.innerHTML = head + `
-                <div style="font-size:12px;color:var(--text2);background:#f0fdf4;border:1px solid #c7e9cc;border-radius:8px;padding:8px 10px;margin-bottom:8px;">
-                    📱 Bu depo WhatsApp ile çalışıyor.
-                </div>
-                <button class="cmd-btn" style="background:#25d366;color:#fff;width:100%;" onclick="
-                    ${targetPhone ? 
-                      `window.open('https://wa.me/${targetPhone}?text=${encodedMsg}', '_blank')` : 
-                      `navigator.clipboard.writeText(\`${msg}\`).then(() => { alert('Mesaj kopyalandı, gruba yapıştırın!'); window.open('https://web.whatsapp.com/', '_blank'); })`
-                    }
-                ">💬 WhatsApp ile Gönder</button>`;
+const contact = depoKey ? WH_CONTACTS[depoKey] : null;
+
+const encodedMsg = encodeURIComponent(msg);
+
+let btnOnClick;
+if (contact?.phone) {
+    btnOnClick = `window.open('https://wa.me/${contact.phone}?text=${encodedMsg}', '_blank')`;
+} else if (contact?.group) {
+    // Grup: önce mesajı kopyala, sonra grubu aç
+    btnOnClick = `navigator.clipboard.writeText(\`${msg}\`).then(() => window.open('${contact.group}', '_blank'))`;
+} else {
+    // Yedek: wa.me aç, mesajı kopyala
+    btnOnClick = `navigator.clipboard.writeText(\`${msg}\`).then(() => { alert('Mesaj kopyalandı! WhatsApp grubuna yapıştırın.'); window.open('https://web.whatsapp.com/', '_blank'); })`;
+}
+
+box.innerHTML = head + `
+    <div style="font-size:12px;color:var(--text2);background:#f0fdf4;border:1px solid #c7e9cc;border-radius:8px;padding:8px 10px;margin-bottom:8px;">
+        📱 <b>${depoKey || d.warehouseName}</b> · <span style="font-family:monospace;">${whId}</span><br>
+        <span style="white-space:pre-wrap;font-size:11px;color:var(--text3);">${_msgEsc(msg)}</span>
+    </div>
+    <button class="cmd-btn" style="background:#25d366;color:#fff;width:100%;" onclick="${btnOnClick}">
+        💬 WhatsApp ile Gönder
+    </button>`;
         } 
         // --- EĞER SF CHAT İSE ---
         else if (d.channel === 'sf' && d.chatId) {
