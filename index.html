@@ -2636,6 +2636,7 @@ async function openWarehouse(mktId, id, btn) {
         // WhatsApp deposu mu?
         const isWhatsAppDepo = whName.includes('PREPLARGE') || whName.includes('COMFYSHIP') || whName.includes('FULLFILLONUS') || whId.startsWith('CS-') || whId.startsWith('DRP-') || whId.startsWith('LMG-');
         
+        if (isWhatsAppDepo) {
         // WhatsApp Numaraları (Boş ise grup linki gibi davranır)
         // Depo kimliğine göre WhatsApp hedefini belirle
 // warehouseId prefix'i: CS- → COMFYSHIP, DRP- → PREPLARGE, LMG- → FULLFILLONUS/SHIPPINGLOT
