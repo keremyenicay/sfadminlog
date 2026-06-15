@@ -2612,49 +2612,74 @@ function _sendStale(mktId, id) {
 }
 
 async function openWarehouse(mktId, id, btn) {
-  const box = document.getElementById(`msg-wh-${mktId}-${id}`);
-  if (!box) return;
-  if (box.style.display === 'block' && box.dataset.loaded === '1') { box.style.display = 'none'; box.dataset.loaded = '0'; return; }
-  box.style.display = 'block';
-  box.innerHTML = '<div style="font-size:12px;color:var(--text3);">🏭 Depo bilgisi alınıyor...</div>';
-  if (btn) btn.classList.add('loading');
-  const serverUrl = getServerUrl();
-  try {
-    const res = await fetch(`${serverUrl}/messages/warehouse`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mktId, messageId: id })
-    });
-    const d = await res.json();
-    if (!d.ok) { box.innerHTML = `<div style="font-size:12px;color:#dc2626;">${_msgEsc(d.error || 'Hata')}</div>`; box.dataset.loaded = '1'; return; }
+    const box = document.getElementById(`msg-wh-${mktId}-${id}`);
+    if (!box) return;
+    if (box.style.display === 'block' && box.dataset.loaded === '1') { box.style.display = 'none'; box.dataset.loaded = '0'; return; }
+    
+    box.style.display = 'block';
+    box.innerHTML = '<div style="font-size:12px;color:var(--text3);">🏭 Depo bilgisi alınıyor...</div>';
+    if (btn) btn.classList.add('loading');
 
-    const head = `<div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px;">🏭 ${_msgEsc(d.warehouseName || 'Depo')} ${d.channel === 'sf' ? '· SF chat' : d.channel === 'whatsapp' ? '· WhatsApp' : ''}</div>`;
+    const serverUrl = getServerUrl();
+    try {
+        const res = await fetch(`${serverUrl}/messages/warehouse`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mktId, messageId: id })
+        });
+        const d = await res.json();
+        if (!d.ok) { box.innerHTML = `<div style="font-size:12px;color:#dc2626;">${_msgEsc(d.error || 'Hata')}</div>`; box.dataset.loaded = '1'; return; }
 
-    if (d.channel === 'sf' && d.chatId) {
-      const chat = (d.messages || []).map(msg => {
-        const me = msg.sender === 'Biz';
-        return `<div style="display:flex;justify-content:${me ? 'flex-end' : 'flex-start'};margin-bottom:4px;">
-          <div style="max-width:80%;background:${me ? '#e7f0ff' : 'var(--bg2)'};border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;color:var(--text);white-space:pre-wrap;">
-            <span style="font-size:10px;color:var(--text3);">${me ? 'Biz' : 'Depo'}</span><br>${_msgEsc(msg.text)}
-          </div></div>`;
-      }).join('') || '<div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Henüz mesaj yok.</div>';
+        // --- WHATSAPP KONTROLÜ İÇİN DEĞİŞKENLER ---
+        const whName = (d.warehouseName || '').toUpperCase();
+        const isWhatsAppDepo = whName.includes('PREPLARGE') || whName.includes('COMFYSHIP') || whName.includes('FULLFILLONUS');
+        
+        // WhatsApp Numaraları (Boş ise grup linki gibi davranır)
+        const WH_CONTACTS = { 'PREPLARGE': '905301234567', 'COMFYSHIP': '', 'FULLFILLONUS': '' };
+        const targetPhone = Object.keys(WH_CONTACTS).find(k => whName.includes(k)) ? WH_CONTACTS[Object.keys(WH_CONTACTS).find(k => whName.includes(k))] : null;
 
-      box.innerHTML = head + chat + `
-        <div style="font-size:11px;color:var(--text3);font-weight:700;margin:6px 0 4px;">✍️ Depoya Türkçe mesaj</div>
-        <textarea id="msg-whta-${mktId}-${id}" style="width:100%;min-height:70px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;background:#fff;">${_msgEsc(d.aiDraft || '')}</textarea>
-        <div style="margin-top:6px;">
-          <button class="cmd-btn" style="background:#2563eb;color:#fff;" onclick="sendWarehouse('${mktId}','${id}','${d.chatId}',this)">🏭 Depoya Gönder</button>
-        </div>`;
-    } else if (d.channel === 'whatsapp') {
-      box.innerHTML = head + `<div style="font-size:12px;color:var(--text2);background:#f0fdf4;border:1px solid #c7e9cc;border-radius:8px;padding:8px 10px;">📱 Bu depo WhatsApp ile iletişim kuruyor (${_msgEsc(d.group || '')}). WhatsApp gönderimi sonraki adımda eklenecek.</div>`;
-    } else {
-      box.innerHTML = head + `<div style="font-size:12px;color:var(--text3);">${_msgEsc(d.note || 'Depo chat bulunamadı.')}</div>`;
+        const head = `<div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px;">🏭 ${_msgEsc(d.warehouseName || 'Depo')} ${d.channel === 'sf' ? '· SF chat' : d.channel === 'whatsapp' ? '· WhatsApp' : ''}</div>`;
+
+        // --- EĞER WHATSAPP DEPOSU İSE ---
+        if (isWhatsAppDepo) {
+            const msg = d.aiDraft || 'Merhaba, sipariş durumu hakkında bilgi alabilir miyim?';
+            const encodedMsg = encodeURIComponent(msg);
+
+            box.innerHTML = head + `
+                <div style="font-size:12px;color:var(--text2);background:#f0fdf4;border:1px solid #c7e9cc;border-radius:8px;padding:8px 10px;margin-bottom:8px;">
+                    📱 Bu depo WhatsApp ile çalışıyor.
+                </div>
+                <button class="cmd-btn" style="background:#25d366;color:#fff;width:100%;" onclick="
+                    ${targetPhone ? 
+                      `window.open('https://wa.me/${targetPhone}?text=${encodedMsg}', '_blank')` : 
+                      `navigator.clipboard.writeText(\`${msg}\`).then(() => { alert('Mesaj kopyalandı, gruba yapıştırın!'); window.open('https://web.whatsapp.com/', '_blank'); })`
+                    }
+                ">💬 WhatsApp ile Gönder</button>`;
+        } 
+        // --- EĞER SF CHAT İSE ---
+        else if (d.channel === 'sf' && d.chatId) {
+            const chat = (d.messages || []).map(msg => {
+                const me = msg.sender === 'Biz';
+                return `<div style="display:flex;justify-content:${me ? 'flex-end' : 'flex-start'};margin-bottom:4px;">
+                  <div style="max-width:80%;background:${me ? '#e7f0ff' : 'var(--bg2)'};border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;color:var(--text);white-space:pre-wrap;">
+                    <span style="font-size:10px;color:var(--text3);">${me ? 'Biz' : 'Depo'}</span><br>${_msgEsc(msg.text)}
+                  </div></div>`;
+            }).join('') || '<div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Henüz mesaj yok.</div>';
+
+            box.innerHTML = head + chat + `
+                <div style="font-size:11px;color:var(--text3);font-weight:700;margin:6px 0 4px;">✍️ Depoya Türkçe mesaj</div>
+                <textarea id="msg-whta-${mktId}-${id}" style="width:100%;min-height:70px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;background:#fff;">${_msgEsc(d.aiDraft || '')}</textarea>
+                <div style="margin-top:6px;">
+                  <button class="cmd-btn" style="background:#2563eb;color:#fff;" onclick="sendWarehouse('${mktId}','${id}','${d.chatId}',this)">🏭 Depoya Gönder</button>
+                </div>`;
+        } else {
+            box.innerHTML = head + `<div style="font-size:12px;color:var(--text3);">${_msgEsc(d.note || 'Depo chat bulunamadı.')}</div>`;
+        }
+        box.dataset.loaded = '1';
+    } catch (e) {
+        box.innerHTML = `<div style="font-size:12px;color:#dc2626;">Bağlantı hatası: ${_msgEsc(e.message)}</div>`;
+        box.dataset.loaded = '1';
     }
-    box.dataset.loaded = '1';
-  } catch (e) {
-    box.innerHTML = `<div style="font-size:12px;color:#dc2626;">Bağlantı hatası: ${_msgEsc(e.message)}</div>`;
-    box.dataset.loaded = '1';
-  }
-  if (btn) btn.classList.remove('loading');
+    if (btn) btn.classList.remove('loading');
 }
 
 async function sendWarehouse(mktId, id, chatId, btn) {
