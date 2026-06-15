@@ -2611,15 +2611,19 @@ function _sendStale(mktId, id) {
   if (box) box.style.opacity = '0.5';
 }
 
+// Preplarge tek numara; Comfy+Fulfill ortak grup (grup linki varsa buraya ekle)
+const WH_PHONES = { preplarge: '905516293724', comfy_fulfill: '' };
+
 async function openWarehouse(mktId, id, btn) {
     const box = document.getElementById(`msg-wh-${mktId}-${id}`);
     if (!box) return;
-    if (box.style.display === 'block' && box.dataset.loaded === '1') { box.style.display = 'none'; box.dataset.loaded = '0'; return; }
-    
+    // ikinci tıkta kapat
+    if (box.style.display === 'block' && box.dataset.loaded === '1') {
+        box.style.display = 'none'; box.dataset.loaded = '0'; return;
+    }
     box.style.display = 'block';
     box.innerHTML = '<div style="font-size:12px;color:var(--text3);">🏭 Depo bilgisi alınıyor...</div>';
     if (btn) btn.classList.add('loading');
-
     const serverUrl = getServerUrl();
     try {
         const res = await fetch(`${serverUrl}/messages/warehouse`, {
@@ -2627,76 +2631,63 @@ async function openWarehouse(mktId, id, btn) {
             body: JSON.stringify({ mktId, messageId: id })
         });
         const d = await res.json();
-        if (!d.ok) { box.innerHTML = `<div style="font-size:12px;color:#dc2626;">${_msgEsc(d.error || 'Hata')}</div>`; box.dataset.loaded = '1'; return; }
+        if (!d.ok) {
+            box.innerHTML = `<div style="font-size:12px;color:#dc2626;">${_msgEsc(d.error || 'Hata')}</div>`;
+            box.dataset.loaded = '1'; return;
+        }
 
-        // --- DEPO VE WHATSAPP MANTIĞI ---
-        const whName = (d.warehouseName || '').toUpperCase();
-        const whId = d.warehouseId || ''; // Supabase'den gelen gerçek depo kodu (CS-...)
-        
-        // WhatsApp deposu mu?
-        const isWhatsAppDepo = whName.includes('PREPLARGE') || whName.includes('COMFYSHIP') || whName.includes('FULLFILLONUS') || whId.startsWith('CS-') || whId.startsWith('DRP-') || whId.startsWith('LMG-');
-        
-        if (isWhatsAppDepo) {
-        // WhatsApp Numaraları (Boş ise grup linki gibi davranır)
-        // Depo kimliğine göre WhatsApp hedefini belirle
-// warehouseId prefix'i: CS- → COMFYSHIP, DRP- → PREPLARGE, LMG- → FULLFILLONUS/SHIPPINGLOT
-const WH_CONTACTS = {
-    // Telefon numarası varsa: 'wa.me/90XXXXXXXXXX' formatında
-    // Grup linki varsa: 'chat.whatsapp.com/XXXXXX' formatında
-    // İkisi de yoksa: boş → kopyala
-    'PREPLARGE':    { phone: 'wa.me/905516293724',    group: '' },
-    'COMFYSHIP':    { phone: '',  group: '' },
-    'FULLFILLONUS': { phone: '',  group: '' },
-};
+        const title = d.warehouseDb || d.warehouseName || 'Depo';
+        const codeBadge = d.warehouseCode
+            ? ` · <span style="font-family:monospace;color:var(--text2);font-size:11px;">${_msgEsc(d.warehouseCode)}</span>` : '';
+        const chanBadge = d.channel === 'sf' ? ' · SF chat' : d.channel === 'whatsapp' ? ' · WhatsApp' : '';
+        const head = `<div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px;">🏭 ${_msgEsc(title)}${codeBadge}${chanBadge}</div>`;
 
-// warehouseId prefix'inden de eşle (CS- / DRP- / LMG-)
-const WH_ID_MAP = { 'CS-': 'COMFYSHIP', 'DRP-': 'PREPLARGE', 'LMG-': 'FULLFILLONUS' };
+        // ── WhatsApp depoları ──────────────────────────────────────────────
+        if (d.channel === 'whatsapp') {
+            const waMsg  = d.waMessage || '';
+            const phone  = WH_PHONES[d.group] || '';
+            const taId   = `msg-whta-${mktId}-${id}`;
+            const targetLabel = d.group === 'preplarge'
+                ? 'Preplarge'
+                : d.group === 'comfy_fulfill'
+                    ? 'Comfy + Fulfill (ortak grup)'
+                    : _msgEsc(title);
 
-const depoKey = Object.keys(WH_CONTACTS).find(k => whName.includes(k))
-    || WH_ID_MAP[Object.keys(WH_ID_MAP).find(p => whId.startsWith(p)) || ''];
+            const openBtn = phone
+                ? `<button class="cmd-btn" style="background:#25d366;color:#fff;"
+                     onclick="(function(){var t=document.getElementById('${taId}').value;navigator.clipboard.writeText(t);window.open('https://wa.me/${phone}?text='+encodeURIComponent(t),'_blank');})()">
+                     💬 WhatsApp'ta Aç (${targetLabel})</button>`
+                : '';
+            const copyBtn = `<button class="cmd-btn" style="background:#2563eb;color:#fff;"
+                onclick="(function(){navigator.clipboard.writeText(document.getElementById('${taId}').value);showCmdResult('Mesaj kopyalandı 📋');})()">
+                📋 Kopyala</button>`;
 
-const contact = depoKey ? WH_CONTACTS[depoKey] : null;
+            box.innerHTML = head
+                + `<div style="font-size:11px;color:var(--text3);margin-bottom:6px;">📱 Hedef: <b>${targetLabel}</b>${phone ? '' : ' — uygulamadan ilgili gruba gönder'}</div>`
+                + `<textarea id="${taId}" style="width:100%;min-height:90px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;background:#fff;">${_msgEsc(waMsg)}</textarea>`
+                + `<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">${copyBtn}${openBtn}</div>`;
+        }
 
-const encodedMsg = encodeURIComponent(msg);
-
-let btnOnClick;
-if (contact?.phone) {
-    btnOnClick = `window.open('https://wa.me/${contact.phone}?text=${encodedMsg}', '_blank')`;
-} else if (contact?.group) {
-    // Grup: önce mesajı kopyala, sonra grubu aç
-    btnOnClick = `navigator.clipboard.writeText(\`${msg}\`).then(() => window.open('${contact.group}', '_blank'))`;
-} else {
-    // Yedek: wa.me aç, mesajı kopyala
-    btnOnClick = `navigator.clipboard.writeText(\`${msg}\`).then(() => { alert('Mesaj kopyalandı! WhatsApp grubuna yapıştırın.'); window.open('https://web.whatsapp.com/', '_blank'); })`;
-}
-
-box.innerHTML = head + `
-    <div style="font-size:12px;color:var(--text2);background:#f0fdf4;border:1px solid #c7e9cc;border-radius:8px;padding:8px 10px;margin-bottom:8px;">
-        📱 <b>${depoKey || d.warehouseName}</b> · <span style="font-family:monospace;">${whId}</span><br>
-        <span style="white-space:pre-wrap;font-size:11px;color:var(--text3);">${_msgEsc(msg)}</span>
-    </div>
-    <button class="cmd-btn" style="background:#25d366;color:#fff;width:100%;" onclick="${btnOnClick}">
-        💬 WhatsApp ile Gönder
-    </button>`;
-        } 
-        // --- EĞER SF CHAT İSE ---
+        // ── SF / Shippinglot chat ─────────────────────────────────────────
         else if (d.channel === 'sf' && d.chatId) {
-            const chat = (d.messages || []).map(msg => {
-                const me = msg.sender === 'Biz';
+            const taId = `msg-whta-${mktId}-${id}`;
+            const chat = (d.messages || []).map(mm => {
+                const me = mm.sender === 'Biz';
                 return `<div style="display:flex;justify-content:${me ? 'flex-end' : 'flex-start'};margin-bottom:4px;">
                   <div style="max-width:80%;background:${me ? '#e7f0ff' : 'var(--bg2)'};border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;color:var(--text);white-space:pre-wrap;">
-                    <span style="font-size:10px;color:var(--text3);">${me ? 'Biz' : 'Depo'}</span><br>${_msgEsc(msg.text)}
+                    <span style="font-size:10px;color:var(--text3);">${mm.sender}</span><br>${_msgEsc(mm.text)}
                   </div></div>`;
             }).join('') || '<div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Henüz mesaj yok.</div>';
 
-            box.innerHTML = head + chat + `
-                <div style="font-size:11px;color:var(--text3);font-weight:700;margin:6px 0 4px;">✍️ Depoya Türkçe mesaj</div>
-                <textarea id="msg-whta-${mktId}-${id}" style="width:100%;min-height:70px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;background:#fff;">${_msgEsc(d.aiDraft || '')}</textarea>
-                <div style="margin-top:6px;">
-                  <button class="cmd-btn" style="background:#2563eb;color:#fff;" onclick="sendWarehouse('${mktId}','${id}','${d.chatId}',this)">🏭 Depoya Gönder</button>
-                </div>`;
-        } else {
-            box.innerHTML = head + `<div style="font-size:12px;color:var(--text3);">${_msgEsc(d.note || 'Depo chat bulunamadı.')}</div>`;
+            box.innerHTML = head + chat
+                + `<div style="font-size:11px;color:var(--text3);font-weight:700;margin:6px 0 4px;">✍️ Depoya Türkçe mesaj</div>`
+                + `<textarea id="${taId}" style="width:100%;min-height:70px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;background:#fff;">${_msgEsc(d.aiDraft || '')}</textarea>`
+                + `<div style="margin-top:6px;"><button class="cmd-btn" style="background:#2563eb;color:#fff;" onclick="sendWarehouse('${mktId}','${id}','${d.chatId}',this)">🏭 Depoya Gönder</button></div>`;
+        }
+
+        // ── Bilinmeyen ────────────────────────────────────────────────────
+        else {
+            box.innerHTML = head + `<div style="font-size:12px;color:var(--text3);">${_msgEsc(d.note || 'Depo tespit edilemedi.')}</div>`;
         }
         box.dataset.loaded = '1';
     } catch (e) {
