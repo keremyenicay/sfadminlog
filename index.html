@@ -2655,11 +2655,11 @@ async function openWarehouse(mktId, id, btn) {
 
             const openBtn = phone
                 ? `<button class="cmd-btn" style="background:#25d366;color:#fff;"
-                     onclick="(function(){var t=document.getElementById('${taId}').value;navigator.clipboard.writeText(t);window.open('https://wa.me/${phone}?text='+encodeURIComponent(t),'_blank');})()">
+                     onclick="(function(){var t=document.getElementById('${taId}').value;navigator.clipboard.writeText(t);window.open('https://wa.me/${phone}?text='+encodeURIComponent(t),'_blank');saveWhatsappExample('${mktId}','${d.group}',(d.warehouseCode||''),t);})()">
                      💬 WhatsApp'ta Aç (${targetLabel})</button>`
                 : '';
             const copyBtn = `<button class="cmd-btn" style="background:#2563eb;color:#fff;"
-                onclick="(function(){navigator.clipboard.writeText(document.getElementById('${taId}').value);showCmdResult('Mesaj kopyalandı 📋');})()">
+                onclick="(function(){navigator.clipboard.writeText(document.getElementById('${taId}').value);showCmdResult('Mesaj kopyalandı 📋');saveWhatsappExample('${mktId}','${d.group}',(d.warehouseCode||''),document.getElementById('${taId}').value);})()">
                 📋 Kopyala</button>`;
 
             box.innerHTML = head
@@ -2695,6 +2695,16 @@ async function openWarehouse(mktId, id, btn) {
         box.dataset.loaded = '1';
     }
     if (btn) btn.classList.remove('loading');
+}
+
+async function saveWhatsappExample(mktId, group, warehouseCode, text) {
+    try {
+        const serverUrl = getServerUrl();
+        await fetch(`${serverUrl}/messages/wh-example`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mktId, group, warehouseCode, text })
+        });
+    } catch (e) { /* sessizce geç, kritik değil */ }
 }
 
 async function sendWarehouse(mktId, id, chatId, btn) {
