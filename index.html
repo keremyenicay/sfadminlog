@@ -909,6 +909,41 @@ td { padding: 16px 24px; vertical-align: middle; }
 .profit-summary-card .psc-label { font-size: 10px; color: var(--text3); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
 .profit-summary-card .psc-val { font-size: 18px; font-weight: 800; color: var(--seller-green); font-family: var(--mono); }
 .profit-summary-card .psc-try { font-size: 13px; font-weight: 700; color: #dc2626; font-family: var(--mono); margin-top: 3px; }
+
+/* ── SEARCH VIEW ── */
+#search-view { display:none; position:fixed; left:0; right:0; bottom:0; top:calc(70px + var(--safe-top)); z-index:49; background:linear-gradient(135deg,#e8f4fd 0%,#f4f7fb 100%); overflow-y:auto; }
+.search-inner { max-width:780px; margin:0 auto; padding:16px 16px calc(16px + var(--safe-bot)); }
+.search-bar { display:flex; gap:8px; margin-bottom:16px; }
+.search-input {
+  flex:1; padding:10px 14px; border-radius:12px;
+  border:1.5px solid var(--border2); background:var(--bg1);
+  font-family:var(--sans); font-size:14px; color:var(--text);
+  outline:none; transition:border-color .2s;
+  box-shadow:0 2px 8px rgba(15,23,42,0.05);
+}
+.search-input:focus { border-color:var(--seller-blue); }
+.search-btn {
+  padding:10px 18px; border-radius:12px;
+  background:var(--seller-blue); color:#fff;
+  border:none; font-family:var(--sans); font-size:13px; font-weight:600;
+  cursor:pointer; transition:opacity .2s;
+}
+.search-btn:hover { opacity:.85; }
+.search-result-count { font-size:12px; color:var(--text3); margin-bottom:10px; }
+.search-card {
+  background:var(--bg1); border:1px solid var(--border);
+  border-radius:var(--radius); padding:14px 16px; margin-bottom:10px;
+  box-shadow:0 2px 10px rgba(15,23,42,0.05);
+}
+.search-card-header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+.search-card-sid { font-family:var(--mono); font-size:13px; font-weight:700; color:var(--seller-blue); }
+.search-card-mkt { font-size:11px; background:rgba(2,132,199,0.1); color:var(--seller-blue); padding:2px 8px; border-radius:6px; font-weight:600; }
+.search-card-status { font-size:12px; font-weight:700; }
+.search-card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:6px 14px; }
+.search-card-field { display:flex; flex-direction:column; gap:2px; }
+.search-card-label { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:var(--text3); font-weight:700; }
+.search-card-val { font-size:12px; color:var(--text2); font-family:var(--mono); word-break:break-all; }
+.search-empty { text-align:center; padding:40px 16px; color:var(--text3); font-size:14px; }
 </style>
 </head>
 <body>
@@ -968,6 +1003,12 @@ td { padding: 16px 24px; vertical-align: middle; }
     <button class="icon-btn" id="profit-tab-btn" onclick="toggleProfitPanel()" title="Kâr Raporu" style="position:relative;">
       💰
     </button>
+    <button class="icon-btn" id="search-back-btn" onclick="toggleSearchPanel()" title="Geri Dön" style="display:none;background:rgba(2,132,199,0.12);border-color:rgba(2,132,199,0.3);color:var(--seller-blue);font-size:16px;font-weight:700;">
+      ←
+    </button>
+    <button class="icon-btn" id="search-tab-btn" onclick="toggleSearchPanel()" title="Sipariş Ara" style="position:relative;">
+      🔍
+    </button>
     <button class="icon-btn" id="settings-btn" onclick="openSettings()" title="Ayarlar">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -1026,6 +1067,18 @@ td { padding: 16px 24px; vertical-align: middle; }
     </div>
     <div id="msg-list"></div>
     <div id="msg-empty" style="display:none;text-align:center;padding:40px 16px;color:var(--text3);font-size:14px;">Bekleyen mesaj yok. "Mesajları Tara" ile kontrol et.</div>
+  </div>
+</div>
+
+<!-- SİPARİŞ ARAMA VIEW -->
+<div id="search-view">
+  <div class="search-inner">
+    <div class="search-bar">
+      <input class="search-input" id="search-input" type="text" placeholder="Sipariş No, Takip No, ASIN, Buyer Order ID..." autocomplete="off" autocorrect="off" autocapitalize="off" onkeydown="if(event.key==='Enter')runSearch()">
+      <button class="search-btn" onclick="runSearch()">Ara</button>
+    </div>
+    <div id="search-result-count" class="search-result-count"></div>
+    <div id="search-results"></div>
   </div>
 </div>
 
@@ -2380,6 +2433,7 @@ function _orderBox(r) {
 function toggleMsgPanel() {
   _msgPanelOpen = !_msgPanelOpen;
   if (_msgPanelOpen && _profitPanelOpen) toggleProfitPanel();
+  if (_msgPanelOpen && _searchPanelOpen) toggleSearchPanel();
   const view    = document.getElementById('msg-view');
   const main    = document.getElementById('main');
   const btn     = document.getElementById('msg-tab-btn');
@@ -2849,6 +2903,7 @@ let _profitPanelOpen = false;
 
 function toggleProfitPanel() {
   _profitPanelOpen = !_profitPanelOpen;
+  if (_profitPanelOpen && _searchPanelOpen) toggleSearchPanel();
   const view     = document.getElementById('profit-view');
   const main     = document.getElementById('main');
   const btn      = document.getElementById('profit-tab-btn');
@@ -2951,6 +3006,117 @@ let rows = Object.values(db).filter(o => {
       <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:#dc2626;text-align:right;white-space:nowrap;">${fmtTRY(tryVal)}</div>
     </div>`;
   }).join('');
+}
+
+// ─── SEARCH PANEL ────────────────────────────────────────────────────────────
+let _searchPanelOpen = false;
+
+function toggleSearchPanel() {
+  _searchPanelOpen = !_searchPanelOpen;
+  if (_searchPanelOpen && _profitPanelOpen) toggleProfitPanel();
+  if (_searchPanelOpen && _msgPanelOpen) toggleMsgPanel();
+  const view    = document.getElementById('search-view');
+  const main    = document.getElementById('main');
+  const btn     = document.getElementById('search-tab-btn');
+  const backBtn = document.getElementById('search-back-btn');
+  const logoText= document.querySelector('.logo-text');
+  view.style.display    = _searchPanelOpen ? 'block' : 'none';
+  main.style.display    = _searchPanelOpen ? 'none'  : '';
+  btn.style.display     = _searchPanelOpen ? 'none'  : '';
+  backBtn.style.display = _searchPanelOpen ? 'flex'  : 'none';
+  if (logoText) logoText.innerHTML = _searchPanelOpen ? 'Sipariş <span>Ara</span>' : 'Seller<span>Flash</span>';
+  if (_searchPanelOpen) {
+    setTimeout(() => { const inp = document.getElementById('search-input'); if (inp) inp.focus(); }, 100);
+  }
+}
+
+async function runSearch() {
+  const query = (document.getElementById('search-input').value || '').trim().toLowerCase();
+  const resultEl = document.getElementById('search-results');
+  const countEl  = document.getElementById('search-result-count');
+  if (!query) { resultEl.innerHTML = ''; countEl.textContent = ''; return; }
+
+  resultEl.innerHTML = '<div class="search-empty">Aranıyor...</div>';
+  countEl.textContent = '';
+
+  const mkts = (CFG.mkts && CFG.mkts.length) ? CFG.mkts : [];
+  const results = [];
+  for (const mktId of mkts) {
+    try {
+      const data = await sbGet(`DB_${mktId}`);
+      if (!data || typeof data !== 'object') continue;
+      for (const [sid, o] of Object.entries(data)) {
+        const haystack = [
+          sid,
+          o.buyerOrderId,
+          o.whTracking,
+          o.asin,
+          o.sellerOrderId,
+          o.sfSku
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (haystack.includes(query)) {
+          results.push({ sid, mktId, ...o });
+        }
+      }
+    } catch(e) { /* skip failed mkt */ }
+  }
+
+  countEl.textContent = results.length ? `${results.length} sipariş bulundu` : '';
+
+  if (!results.length) {
+    resultEl.innerHTML = '<div class="search-empty">Eşleşen sipariş bulunamadı.</div>';
+    return;
+  }
+
+  const fmtDate = ts => ts ? new Date(ts).toLocaleDateString('tr-TR',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+  const statusBadge = o => {
+    if (o.sfDelivered)    return '<span class="search-card-status" style="color:var(--green);">✅ Teslim</span>';
+    if (o.isCancelledSF)  return '<span class="search-card-status" style="color:var(--red);">🚫 İptal</span>';
+    return `<span class="search-card-status" style="color:var(--text2);">${o.status || '—'}</span>`;
+  };
+
+  resultEl.innerHTML = results.map(o => `
+    <div class="search-card">
+      <div class="search-card-header">
+        <span class="search-card-sid">${o.sid}</span>
+        <span class="search-card-mkt">Mkt ${o.mktId}</span>
+        ${statusBadge(o)}
+      </div>
+      <div class="search-card-grid">
+        <div class="search-card-field">
+          <span class="search-card-label">Depo</span>
+          <span class="search-card-val">${o.warehouse || o.warehouseId || '—'}</span>
+        </div>
+        <div class="search-card-field">
+          <span class="search-card-label">Kargo</span>
+          <span class="search-card-val">${o.cargoCompany ? o.cargoCompany + (o.whTracking ? ' · ' + o.whTracking : '') : o.whTracking || '—'}</span>
+        </div>
+        <div class="search-card-field">
+          <span class="search-card-label">Kargo Durumu</span>
+          <span class="search-card-val">${o.whTrackStatus || '—'}</span>
+        </div>
+        <div class="search-card-field">
+          <span class="search-card-label">Buyer Order ID</span>
+          <span class="search-card-val">${o.buyerOrderId || '—'}</span>
+        </div>
+        <div class="search-card-field">
+          <span class="search-card-label">ASIN</span>
+          <span class="search-card-val">${o.asin || '—'}</span>
+        </div>
+        <div class="search-card-field">
+          <span class="search-card-label">Kâr</span>
+          <span class="search-card-val" style="color:${(o.finalProfit||0)>=0?'var(--green)':'var(--red)'};">${o.finalProfit != null ? parseFloat(o.finalProfit).toFixed(2) : '—'}</span>
+        </div>
+        <div class="search-card-field">
+          <span class="search-card-label">Sipariş Tarihi</span>
+          <span class="search-card-val">${fmtDate(o.orderDate)}</span>
+        </div>
+        <div class="search-card-field">
+          <span class="search-card-label">Teslimat Son Gün</span>
+          <span class="search-card-val">${fmtDate(o.deliveryEndDate)}</span>
+        </div>
+      </div>
+    </div>`).join('');
 }
 
 async function init() {
