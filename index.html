@@ -188,7 +188,7 @@ body::before {
   display: flex; align-items: center; gap: 16px;
 }
 
-.logo { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.logo { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
 .logo-icon {
   width: 38px; height: 38px;
   background: var(--sf-grad);
@@ -205,7 +205,7 @@ body::before {
   -webkit-text-fill-color: transparent;
 }
 
-#topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+#topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: nowrap; overflow: visible; }
 
 .conn-pill {
   display: flex; align-items: center; gap: 8px;
@@ -678,11 +678,11 @@ td { padding: 16px 24px; vertical-align: middle; }
     gap: 8px; 
     height: calc(64px + var(--safe-top)); 
   }
-  .logo-icon { width: 34px; height: 34px; font-size: 14px; }
-  .logo-text { font-size: 15px; }
-  .conn-pill { padding: 6px 10px; font-size: 11px; }
-  .icon-btn, .refresh-btn { width: 36px; height: 36px; }
-  #topbar-right { gap: 8px; }
+  .logo-icon { width: 32px; height: 32px; font-size: 13px; }
+  .logo-text { font-size: 14px; }
+  .conn-pill { padding: 5px 8px; font-size: 11px; gap: 5px; }
+  .icon-btn, .refresh-btn { width: 34px; height: 34px; border-radius: 10px; }
+  #topbar-right { gap: 5px; }
 
   /* Ana içerik padding'lerini daraltma */
   #main { padding: 16px 12px; }
@@ -3069,6 +3069,17 @@ async function runSearch() {
   }
 
   const fmtDate = ts => ts ? new Date(ts).toLocaleDateString('tr-TR',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+  const buildTrackUrl = (carrier, num) => {
+    if (!num) return '';
+    const c = (carrier || '').toLowerCase();
+    if (c.includes('dhl'))     return `https://www.dhl.com/us-en/home/tracking.html?tracking-id=${num}&submit=1`;
+    if (c.includes('asendia')) return `https://a1.asendiausa.com/tracking/?trackingnumber=${num}`;
+    if (c.includes('fedex'))   return `https://www.fedex.com/fedextrack/?trknbr=${num}`;
+    if (c.includes('ups'))     return `https://www.ups.com/track?tracknum=${num}`;
+    if (c.includes('apc') || c.includes('evri') || c.includes('hermes')) return `https://www.evri.com/track/parcel/${num}`;
+    if (c.includes('epost') || c.includes('epg') || num.toUpperCase().startsWith('EPG')) return `https://portal.epgshipping.com/ParcelTracker/HomePageTracker`;
+    return `https://parcelsapp.com/en/tracking/${num}`;
+  };
   const statusBadge = o => {
     if (o.sfDelivered)    return '<span class="search-card-status" style="color:var(--green);">✅ Teslim</span>';
     if (o.isCancelledSF)  return '<span class="search-card-status" style="color:var(--red);">🚫 İptal</span>';
@@ -3089,7 +3100,7 @@ async function runSearch() {
         </div>
         <div class="search-card-field">
           <span class="search-card-label">Kargo</span>
-          <span class="search-card-val">${o.cargoCompany ? o.cargoCompany + (o.whTracking ? ' · ' + o.whTracking : '') : o.whTracking || '—'}</span>
+          <span class="search-card-val">${(() => { const trackUrl = buildTrackUrl(o.cargoCompany, o.whTracking); const trackLink = o.whTracking ? (trackUrl ? `<a href="${trackUrl}" target="_blank" style="color:var(--seller-blue);text-decoration:none;font-family:var(--mono);font-size:13px;">${o.whTracking}</a>` : `<span style="font-family:var(--mono);font-size:13px;">${o.whTracking}</span>`) : ''; return o.cargoCompany ? o.cargoCompany + (trackLink ? ' · ' + trackLink : '') : trackLink || '—'; })()}</span>
         </div>
         <div class="search-card-field">
           <span class="search-card-label">Kargo Durumu</span>
