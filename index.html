@@ -929,6 +929,8 @@ td { padding: 16px 24px; vertical-align: middle; }
     <input class="cfg-input" id="cfg-mkts" type="text" placeholder="78524,87709" value="78524,87709" autocomplete="off" autocorrect="off">
     <div class="cfg-label">Sunucu URL (Komut Paneli için)</div>
     <input class="cfg-input" id="cfg-server" type="url" placeholder="https://your-app.railway.app" autocomplete="off" autocorrect="off" autocapitalize="off">
+    <div class="cfg-label">Sunucu API Key (Güvenlik)</div>
+    <input class="cfg-input" id="cfg-apikey" type="password" placeholder="Railway'de API_KEY env var ile aynı değer" autocomplete="off">
     <div class="cfg-note">🔒 Ayarlar yalnızca bu tarayıcıda (Local Storage) saklanır.</div>
     <button id="cfg-save">Bağlan →</button>
   </div>
@@ -1140,7 +1142,7 @@ td { padding: 16px 24px; vertical-align: middle; }
 
 <script>
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
-let CFG = { url: '', key: '', mkts: ['78524', '87709'], serverUrl: '' };
+let CFG = { url: '', key: '', mkts: ['78524', '87709'], serverUrl: '', apiKey: '' };
 let _allOrders    = [];
 let _activeFilter = 'all';
 let _activeMkt    = null;
@@ -1164,8 +1166,9 @@ function saveConfig() {
   const key       = document.getElementById('cfg-key').value.trim();
   const mkts      = document.getElementById('cfg-mkts').value.split(',').map(s => s.trim()).filter(Boolean);
   const serverUrl = document.getElementById('cfg-server').value.trim().replace(/\/$/, '');
+  const apiKey    = document.getElementById('cfg-apikey').value.trim();
   if (!url || !key) { showToast('URL ve Key zorunludur!', 'error'); return; }
-  CFG = { url, key, mkts, serverUrl };
+  CFG = { url, key, mkts, serverUrl, apiKey };
   localStorage.setItem('sf_cfg', JSON.stringify(CFG));
   document.getElementById('config-overlay').style.display = 'none';
   init();
@@ -1176,6 +1179,7 @@ function openSettings() {
   document.getElementById('cfg-key').value    = CFG.key    || '';
   document.getElementById('cfg-mkts').value   = (CFG.mkts || []).join(',');
   document.getElementById('cfg-server').value = CFG.serverUrl || '';
+  document.getElementById('cfg-apikey').value = CFG.apiKey   || '';
   document.getElementById('config-overlay').style.display = 'flex';
 }
 
@@ -2237,6 +2241,18 @@ function getServerUrl() {
   // CFG.serverUrl varsa kullan, yoksa aynı origin'den serve ediliyorsa boş bırak
   return (CFG.serverUrl || '').replace(/\/$/, '');
 }
+
+// Sunucuya giden tüm fetch çağrılarına otomatik Authorization header ekler
+(function patchFetchForServerAuth() {
+  const _orig = window.fetch;
+  window.fetch = function(url, options = {}) {
+    const sUrl = getServerUrl();
+    if (sUrl && CFG.apiKey && typeof url === 'string' && url.startsWith(sUrl)) {
+      options = { ...options, headers: { ...options.headers, 'Authorization': 'Bearer ' + CFG.apiKey } };
+    }
+    return _orig.call(this, url, options);
+  };
+})();
 
 async function triggerCmd(cmd, mktId, btn) {
   if (btn) btn.classList.add('loading');
