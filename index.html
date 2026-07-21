@@ -1043,6 +1043,19 @@ td { padding: 16px 24px; vertical-align: middle; }
       <button class="profit-period-btn" onclick="setProfitPeriod('month',this)">Bu Ay</button>
       <button class="profit-period-btn" onclick="setProfitPeriod('month30',this)">Son 30 Gün</button>
       <button class="profit-period-btn" onclick="setProfitPeriod('all',this)">Tümü</button>
+      <button class="profit-period-btn" id="profit-custom-btn" onclick="setProfitPeriod('custom',this)">📅 Tarih Seç</button>
+    </div>
+    <!-- Özel Tarih Aralığı (Takvim) -->
+    <div id="profit-custom-range" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:0 2px 10px rgba(15,23,42,0.04);">
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        <label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;">Başlangıç</label>
+        <input type="date" id="profit-date-from" style="font-family:var(--mono);font-size:13px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text1);">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        <label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;">Bitiş</label>
+        <input type="date" id="profit-date-to" style="font-family:var(--mono);font-size:13px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text1);">
+      </div>
+      <button class="profit-period-btn active" style="align-self:flex-end;" onclick="applyProfitCustomRange()">Uygula</button>
     </div>
     <!-- Mağaza Filtresi -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;" id="profit-mkt-filter"></div>
@@ -2900,6 +2913,61 @@ async function ignoreMsg(mktId, id, btn) {
 let _profitPeriod   = 'today';
 let _profitMktFilter = null; // null = tümü
 let _profitPanelOpen = false;
+let _profitCustomFrom = null;   // ms timestamp (gün başı)
+let _profitCustomTo   = null;   // ms timestamp (gün sonu)
+
+// ─── Günlük (tarihsel) döviz kurları ─────────────────────────────────────────
+// _fxHist['YYYY-MM-DD'] = { EUR, GBP, AUD }  → 1 birim = X TRY
+window._fxHist = window._fxHist || {};
+let _fxHistFetched = window._fxHistFetched || (window._fxHistFetched = new Set());
+let _fxHistLoading = false;
+
+function _fxYmd(ts) {
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// Belirli bir siparişin tarihine en yakın (o gün ya da önceki iş günü) kuru döndürür.
+// Tarihsel kur yoksa canlı kura düşer.
+function fxRateForDate(ts, cur) {
+  const live = (window._fxRates || {})[cur] || 1;
+  if (!ts) return live;
+  const d = new Date(ts); d.setHours(12,0,0,0);
+  for (let i = 0; i < 8; i++) {           // hafta sonu / tatil için 7 gün geriye bak
+    const day = window._fxHist[_fxYmd(d)];
+    if (day && day[cur]) return day[cur];
+    d.setDate(d.getDate() - 1);
+  }
+  return live;
+}
+
+// Verilen aralık için tarihsel kurları (Frankfurter / ECB) çeker, tamamlanınca yeniden render eder.
+async function ensureFxHistory(fromTs, toTs) {
+  const start = _fxYmd(fromTs);
+  const end   = _fxYmd(Math.min(toTs, Date.now()));
+  if (end < start) return;
+  const key = start + '..' + end;
+  if (_fxHistFetched.has(key) || _fxHistLoading) return;
+  _fxHistLoading = true;
+  try {
+    const url = `https://api.frankfurter.dev/v1/${start}..${end}?base=TRY&symbols=EUR,GBP,AUD`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const j = await res.json();
+      for (const [day, r] of Object.entries(j.rates || {})) {
+        // Frankfurter: 1 TRY = r.EUR birim → biz 1 birim = ? TRY istiyoruz (ters çevir)
+        window._fxHist[day] = {
+          EUR: r.EUR ? 1 / r.EUR : null,
+          GBP: r.GBP ? 1 / r.GBP : null,
+          AUD: r.AUD ? 1 / r.AUD : null,
+        };
+      }
+      _fxHistFetched.add(key);
+    }
+  } catch (e) {}
+  _fxHistLoading = false;
+  if (_profitPanelOpen) renderProfitPanel();
+}
 
 function toggleProfitPanel() {
   _profitPanelOpen = !_profitPanelOpen;
@@ -2921,6 +2989,37 @@ function setProfitPeriod(period, btn) {
   _profitPeriod = period;
   document.querySelectorAll('.profit-period-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
+  // Özel tarih (takvim) satırını göster/gizle
+  const customRow = document.getElementById('profit-custom-range');
+  if (customRow) {
+    if (period === 'custom') {
+      customRow.style.display = 'flex';
+      // Girdileri makul bir varsayılanla doldur (bu ay)
+      const fromEl = document.getElementById('profit-date-from');
+      const toEl   = document.getElementById('profit-date-to');
+      const today  = new Date(); today.setHours(0,0,0,0);
+      if (fromEl && !fromEl.value) { const m = new Date(today); m.setDate(1); fromEl.value = _fxYmd(m); }
+      if (toEl   && !toEl.value)   { toEl.value = _fxYmd(today); }
+    } else {
+      customRow.style.display = 'none';
+    }
+  }
+  renderProfitPanel();
+}
+
+function applyProfitCustomRange() {
+  const fromEl = document.getElementById('profit-date-from');
+  const toEl   = document.getElementById('profit-date-to');
+  if (!fromEl || !toEl || !fromEl.value || !toEl.value) {
+    alert('Lütfen başlangıç ve bitiş tarihi seçin.');
+    return;
+  }
+  let from = new Date(fromEl.value + 'T00:00:00').getTime();
+  let to   = new Date(toEl.value   + 'T23:59:59').getTime();
+  if (from > to) { const t = from; from = to; to = t; }   // ters seçimi düzelt
+  _profitCustomFrom = from;
+  _profitCustomTo   = to;
+  _profitPeriod = 'custom';
   renderProfitPanel();
 }
 
@@ -2932,6 +3031,11 @@ function getProfitDateRange(period) {
   if (period === 'week')      return [now - 7*86400000, now];
   if (period === 'month')     { const m = new Date(d); m.setDate(1); return [m.getTime(), now]; }
   if (period === 'month30')   return [now - 30*86400000, now];
+  if (period === 'custom') {
+    const from = _profitCustomFrom != null ? _profitCustomFrom : d.getTime();
+    const to   = _profitCustomTo   != null ? _profitCustomTo   : now;
+    return [from, to];
+  }
   return [0, now]; // all
 }
 
@@ -2939,8 +3043,11 @@ function renderProfitPanel() {
   const db = window._dbAllOrders || {};
   const rates = window._fxRates || { EUR:1, GBP:1, AUD:1 };
   const [from, to] = getProfitDateRange(_profitPeriod);
+  // Seçili aralık için o günlerin tarihsel kurlarını çek (yoksa canlı kura düşer)
+  ensureFxHistory(from === 0 ? Date.now() - 365*86400000 : from, to);
   const fmtCur = (val, cur) => { const s = cur==='AUD'?'A$':cur==='GBP'?'£':'€'; return s+parseFloat(val).toFixed(2); };
   const fmtTRY = v => '₺'+parseFloat(v).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtRate = v => parseFloat(v).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmtDate = ts => ts ? new Date(ts).toLocaleDateString('tr-TR',{day:'2-digit',month:'short',year:'numeric'}) : '—';
 
   // Mağaza filtre butonları
@@ -2966,7 +3073,7 @@ let rows = Object.values(db).filter(o => {
     const cur = o.currency || 'EUR';
     const p = parseFloat(o.finalProfit) || 0;
     totByCur[cur] = (totByCur[cur]||0) + p;
-    tryTotal.total += p * (rates[cur]||1);
+    tryTotal.total += p * fxRateForDate(o.orderDate, cur);   // her sipariş kendi gününün kuruyla
   }
 
   // Özet kartlar
@@ -2994,13 +3101,16 @@ let rows = Object.values(db).filter(o => {
   tbody.innerHTML = rows.map((o,i) => {
     const cur = o.currency || 'EUR';
     const p = parseFloat(o.finalProfit) || 0;
-    const tryVal = p * (rates[cur]||1);
+    const dayRate = fxRateForDate(o.orderDate, cur);
+    const tryVal = p * dayRate;
+    const curSym = cur==='AUD'?'A$':cur==='GBP'?'£':'€';
     const profitColor = p >= 0 ? 'var(--seller-green)' : 'var(--red)';
     const bg = i % 2 === 0 ? 'var(--bg1)' : 'var(--bg2)';
     return `<div style="display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid var(--border);background:${bg};">
       <div>
         <div style="font-family:var(--mono);font-size:11px;color:var(--seller-blue);line-height:1.3;">${o.sid||'—'}</div>
         <div style="font-size:10px;color:var(--text3);margin-top:1px;">${o.storeName||o.mktId||'—'} · ${fmtDate(o.orderDate)}</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px;font-family:var(--mono);">💱 ${fmtDate(o.orderDate)} kuru: 1${curSym} = ₺${fmtRate(dayRate)}</div>
       </div>
       <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${profitColor};text-align:right;white-space:nowrap;">${fmtCur(p,cur)}</div>
       <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:#dc2626;text-align:right;white-space:nowrap;">${fmtTRY(tryVal)}</div>
