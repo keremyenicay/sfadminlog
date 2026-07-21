@@ -2943,12 +2943,20 @@ function fxRateForDate(ts, cur) {
 
 // Verilen aralık için tarihsel kurları (Frankfurter / ECB) çeker, tamamlanınca yeniden render eder.
 async function ensureFxHistory(fromTs, toTs) {
-  const start = _fxYmd(fromTs);
-  const end   = _fxYmd(Math.min(toTs, Date.now()));
+  let endTs   = Math.min(toTs, Date.now());
+  let startTs = fromTs;
+  // En az ~10 günlük pencere garantile: tek gün / "bugün" aralıklarında ECB o günü
+  // henüz yayınlamamış olabilir; dar aralık komple 404 döner. Geniş pencere ayrıca
+  // hafta sonu/tatil için geriye kur bulmayı da sağlar.
+  if (endTs - startTs < 10*86400000) startTs = endTs - 10*86400000;
+  const start = _fxYmd(startTs);
+  const end   = _fxYmd(endTs);
   if (end < start) return;
   const key = start + '..' + end;
   if (_fxHistFetched.has(key) || _fxHistLoading) return;
   _fxHistLoading = true;
+  _fxHistFetched.add(key);   // aynı aralığı tekrar tekrar (özellikle hata sonrası) denememek için hemen işaretle
+  let gotData = false;
   try {
     const url = `https://api.frankfurter.dev/v1/${start}..${end}?base=TRY&symbols=EUR,GBP,AUD`;
     const res = await fetch(url);
@@ -2961,12 +2969,13 @@ async function ensureFxHistory(fromTs, toTs) {
           GBP: r.GBP ? 1 / r.GBP : null,
           AUD: r.AUD ? 1 / r.AUD : null,
         };
+        gotData = true;
       }
-      _fxHistFetched.add(key);
     }
   } catch (e) {}
   _fxHistLoading = false;
-  if (_profitPanelOpen) renderProfitPanel();
+  // Sadece yeni veri geldiyse yeniden çiz (hata durumunda render→fetch→render döngüsünü önler)
+  if (gotData && _profitPanelOpen) renderProfitPanel();
 }
 
 function toggleProfitPanel() {
