@@ -1911,6 +1911,11 @@ function openModal(order) {
         <div class="detail-key">Son Teslimat</div>
         <div class="detail-val" style="font-size:14px">${delivDate}</div>
       </div>
+      ${order.amazonTrackingId ? `
+      <div class="detail-item">
+        <div class="detail-key">Amazon Takip</div>
+        <div class="detail-val" style="font-family:var(--mono);font-size:14px"><a href="https://parcelsapp.com/en/tracking/${order.amazonTrackingId}" target="_blank" style="color:var(--seller-blue);text-decoration:none">${order.amazonTrackingId}</a></div>
+      </div>` : ''}
       ${order.whName ? `
       <div class="detail-item">
         <div class="detail-key">Depo</div>
@@ -3169,6 +3174,7 @@ async function runSearch() {
           sid,
           o.buyerOrderId,
           o.whTracking,
+          o.amazonTrackingId,
           o.asin,
           o.sellerOrderId,
           o.sfSku
@@ -3224,6 +3230,10 @@ async function runSearch() {
         <div class="search-card-field">
           <span class="search-card-label">Kargo Durumu</span>
           <span class="search-card-val">${o.whTrackStatus || '—'}</span>
+        </div>
+        <div class="search-card-field">
+          <span class="search-card-label">Amazon Takip</span>
+          <span class="search-card-val">${o.amazonTrackingId ? `<a href="${buildTrackUrl('amazon', o.amazonTrackingId)}" target="_blank" style="color:var(--seller-blue);text-decoration:none;font-family:var(--mono);font-size:13px;">${o.amazonTrackingId}</a>` : '—'}</span>
         </div>
         <div class="search-card-field">
           <span class="search-card-label">Buyer Order ID</span>
