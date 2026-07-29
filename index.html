@@ -1139,6 +1139,7 @@ td { padding: 16px 24px; vertical-align: middle; }
         <button class="cmd-btn cmd-btn-cargo" onclick="triggerCmdAll('kargosorgula',this)">📦 Kargo Sorgula</button>
         <button class="cmd-btn cmd-btn-teslim" onclick="triggerCmdAll('teslim',this)">✅ Teslim Sync</button>
         <button class="cmd-btn cmd-btn-depo-refresh" onclick="triggerCmdAll('depo_yenile',this)">🔑 Depo Tokenları Yenile</button>
+        <button class="cmd-btn cmd-btn-depo-refresh" onclick="if(confirm('Yanlış mağazadaki (bug döneminden takılı) siparişleri doğru mağazaya taşı?\n\nGüvenlidir, tekrar çalıştırılabilir. Önce sunucunun yeni sürümü deploy olmuş olmalı.'))triggerCmdAll('temizle_mkt',this)">🧹 Mağaza Temizle</button>
         <button class="cmd-btn cmd-btn-stop" onclick="triggerCmdAll('durdur',this)">⏹ Durdur</button>
       </div>
       <div class="cmd-section-title">Mağaza Seç</div>
