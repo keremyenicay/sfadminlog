@@ -1320,9 +1320,9 @@ async function fetchAllData() {
   const newOrders = [];
 
   const storeNames = {};
-  for (const mktId of CFG.mkts) {
+  await Promise.all(CFG.mkts.map(async (mktId) => {
     storeNames[mktId] = await fetchStoreName(mktId);
-  }
+  }));
 
   // Canlı kur çek (EUR, GBP, AUD → TRY)
   let _rates = { EUR: 1, GBP: 1, AUD: 1 };
@@ -1339,14 +1339,26 @@ async function fetchAllData() {
   } catch(e) {}
   window._fxRates = _rates;
 
-  // Kâr verilerini tüm mağazalardan topla
+  // ── Tüm DB blob'larını TEK SEFER çek (paralel) ve cache'le ──────────────────
+  // Önceden her DB_<mkt> blob'u aynı refresh içinde 3 kez indiriliyordu
+  // (kâr özeti + kâr raporu + pending kontrolü). Artık mağaza başına 1 kez
+  // indirilip aşağıdaki bölümlerin hepsinde yeniden kullanılıyor. Veri/anahtar
+  // formatı değişmedi — yalnızca gereksiz tekrar indirmeler kaldırıldı.
+  const dbCache = {};
+  await Promise.all(CFG.mkts.map(async (mktId) => {
+    try {
+      const rawDb = await sbGet(`DB_${mktId}`);
+      dbCache[mktId] = rawDb ? ((typeof rawDb === 'object') ? rawDb : JSON.parse(rawDb)) : {};
+    } catch(e) { dbCache[mktId] = {}; }
+  }));
+
+  // Kâr verilerini tüm mağazalardan topla (cache'ten)
   const _profitData = {}; // mktId → { total, todayTotal, currency, totalTRY, todayTotalTRY }
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
 
   for (const mktId of CFG.mkts) {
     try {
-      const rawDb = await sbGet(`DB_${mktId}`);
-      const dbFull = rawDb ? ((typeof rawDb === 'object') ? rawDb : JSON.parse(rawDb)) : {};
+      const dbFull = dbCache[mktId] || {};
       let total = 0, todayTotal = 0;
       for (const [sid, o] of Object.entries(dbFull)) {
         const profit = parseFloat(o.finalProfit ?? o.profit ?? 0) || 0;
@@ -1361,12 +1373,11 @@ async function fetchAllData() {
   }
   window._profitData = _profitData;
 
-  // Kâr Raporu için ham DB verilerini sakla
+  // Kâr Raporu için ham DB verilerini sakla (cache'ten)
   const _dbAllOrders = {};
   for (const mktId of CFG.mkts) {
     try {
-      const rawDb = await sbGet(`DB_${mktId}`);
-      const dbFull = rawDb ? ((typeof rawDb === 'object') ? rawDb : JSON.parse(rawDb)) : {};
+      const dbFull = dbCache[mktId] || {};
       for (const [sid, o] of Object.entries(dbFull)) {
         if (o.finalProfit !== undefined && o.finalProfit !== null) {
           const currency = ['78524','216116','87709'].includes(String(mktId)) ? 'AUD' : String(mktId) === '191308' ? 'GBP' : 'EUR';
@@ -1383,11 +1394,8 @@ async function fetchAllData() {
       if (!raw) continue;
       const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
 
-      let dbData = {};
-      try {
-        const rawDb = await sbGet(`DB_${mktId}`);
-        if (rawDb) dbData = (typeof rawDb === 'object') ? rawDb : JSON.parse(rawDb);
-      } catch(e) {}
+      // DB_<mkt> zaten yukarıda cache'lendi — yeniden indirme yok
+      const dbData = dbCache[mktId] || {};
 
       let pendingUpdated = false;
 
