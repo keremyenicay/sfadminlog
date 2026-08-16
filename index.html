@@ -832,6 +832,47 @@ td { padding: 16px 24px; vertical-align: middle; }
 .price-row-val  { font-weight: 800; font-size: 15px; font-family: var(--mono); flex-shrink: 0; margin-left: 12px; }
 .price-row-val.best { color: var(--seller-green); }
 
+/* SF Kargo Seçenekleri (açılır) */
+.sf-carriers {
+  background: #f8fafc; border: 1px solid var(--border);
+  border-radius: 16px; margin-bottom: 24px; overflow: hidden;
+}
+.sf-carriers-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px; cursor: pointer; user-select: none;
+}
+.sf-carriers-head:hover { background: rgba(255,123,0,0.05); }
+.sf-carriers-title {
+  font-size: 12px; text-transform: uppercase; font-weight: 800;
+  color: var(--sf-orange); letter-spacing: 1px;
+}
+.sf-carriers-toggle { color: var(--text3); font-size: 14px; transition: transform .2s; }
+.sf-carriers-body { padding: 4px 20px 18px; }
+.sf-carrier-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.sf-carrier-row:last-child { border-bottom: none; padding-bottom: 0; }
+.sf-carrier-row.best { position: relative; }
+.sf-carrier-row.ineligible { opacity: .55; }
+.sf-carrier-logo {
+  width: 40px; height: 28px; object-fit: contain; flex-shrink: 0;
+  background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px;
+}
+.sf-carrier-info { flex: 1; min-width: 0; }
+.sf-carrier-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.sf-carrier-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.sf-carrier-price { font-weight: 800; font-size: 15px; font-family: var(--mono); color: var(--text); }
+.sf-carrier-price.best { color: var(--seller-green); }
+.sf-carrier-btn {
+  flex-shrink: 0; padding: 8px 14px; font-size: 12px; font-weight: 700;
+  border-radius: 10px; border: 1px solid var(--sf-orange);
+  background: rgba(255,123,0,0.1); color: var(--sf-orange); cursor: pointer;
+  transition: all .2s;
+}
+.sf-carrier-btn:hover:not(:disabled) { background: var(--sf-orange); color: #fff; }
+.sf-carrier-btn:disabled { opacity: .4; cursor: not-allowed; border-color: var(--border); color: var(--text3); background: var(--bg3); }
+
 .modal-actions {
   display: flex; gap: 10px; flex-wrap: wrap; padding-top: 20px;
   border-top: 1px solid var(--border);
@@ -1953,6 +1994,15 @@ function openModal(order) {
       </div>` : ''}
     </div>
     ${pricesHtml}
+    <div class="sf-carriers" id="sf-carriers-box">
+      <div class="sf-carriers-head" onclick="toggleSfCarriers('${order.sid}','${order.mktId}')">
+        <span class="sf-carriers-title">🚚 SF Kargo Seçenekleri</span>
+        <span class="sf-carriers-toggle" id="sf-carriers-arrow">▾</span>
+      </div>
+      <div class="sf-carriers-body" id="sf-carriers-body" style="display:none">
+        <div style="color:var(--text3);font-size:13px;padding:8px 0">Yüklemek için başlığa tıkla.</div>
+      </div>
+    </div>
     <div class="modal-actions">
       ${isPending ? `<div style="width:100%;text-align:center;padding:16px;color:var(--sf-orange);font-weight:700;font-family:var(--mono);background:rgba(255,123,0,0.1);border-radius:12px;">⏳ İşlem Devam Ediyor... Lütfen Bekleyin.</div>` : `
         ${state==='new' ? `<button class="act-btn btn-price" onclick="doPrice(event,'${order.sid}','${order.mktId}')">💰 Fiyat Al</button>` : ''}
@@ -2320,6 +2370,96 @@ function showCmdResult(msg, ok = true) {
 function getServerUrl() {
   // CFG.serverUrl varsa kullan, yoksa aynı origin'den serve ediliyorsa boş bırak
   return (CFG.serverUrl || '').replace(/\/$/, '');
+}
+
+// ─── SF Kargo Seçenekleri (modal açılır bölüm) ─────────────────────────────────
+function toggleSfCarriers(sid, mktId) {
+  const body  = document.getElementById('sf-carriers-body');
+  const arrow = document.getElementById('sf-carriers-arrow');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  if (open) {
+    body.style.display = 'none';
+    if (arrow) arrow.style.transform = '';
+    return;
+  }
+  body.style.display = 'block';
+  if (arrow) arrow.style.transform = 'rotate(180deg)';
+  if (!body.dataset.loaded) loadSfCarriers(sid, mktId);
+}
+
+async function loadSfCarriers(sid, mktId) {
+  const body = document.getElementById('sf-carriers-body');
+  if (!body) return;
+  const serverUrl = getServerUrl();
+  if (!serverUrl || !CFG.apiKey) {
+    body.innerHTML = `<div style="color:var(--red);font-size:13px;padding:8px 0">⚠️ Sunucu ayarlanmamış — Ayarlar'dan Sunucu URL ve API Key gir.</div>`;
+    return;
+  }
+  body.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:8px 0">⏳ Kargo seçenekleri yükleniyor...</div>`;
+  try {
+    const res  = await fetch(`${serverUrl}/sf/sending-options?sid=${encodeURIComponent(sid)}&mktId=${encodeURIComponent(mktId)}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Bilinmeyen hata');
+    const options = data.options || [];
+    if (!options.length) {
+      body.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:8px 0">Kargo seçeneği bulunamadı.</div>`;
+      return;
+    }
+    // En ucuz uygun seçeneği bul
+    let bestCost = Infinity;
+    options.forEach(o => { if (o.isEligibleToSend && typeof o.shippingCost === 'number' && o.shippingCost < bestCost) bestCost = o.shippingCost; });
+
+    body.innerHTML = options.map(o => {
+      const name    = o.carrierName || 'Kargo';
+      const cur     = o.currency || '';
+      const cost    = (typeof o.shippingCost === 'number') ? o.shippingCost.toFixed(2) : '—';
+      const isBest  = o.isEligibleToSend && o.shippingCost === bestCost;
+      const deliv   = (o.minDeliveryDate != null && o.maxDeliveryDate != null) ? `${o.minDeliveryDate}–${o.maxDeliveryDate} gün` : '';
+      const profit  = (typeof o.finalProfitUSD === 'number') ? `Kâr $${o.finalProfitUSD.toFixed(2)}` : '';
+      const eligible = o.isEligibleToSend !== false;
+      const nameJs  = String(name).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const logo    = o.carrierLogoUrl ? String(o.carrierLogoUrl).trim() : '';
+      const logoHtml = logo ? `<img class="sf-carrier-logo" src="${escHtml(logo)}" alt="" onerror="this.style.display='none'">` : `<div class="sf-carrier-logo"></div>`;
+      const meta    = [deliv, profit].filter(Boolean).join(' · ') + (eligible ? '' : ' · ⚠️ Uygun değil');
+      return `<div class="sf-carrier-row${isBest?' best':''}${eligible?'':' ineligible'}">
+        ${logoHtml}
+        <div class="sf-carrier-info">
+          <div class="sf-carrier-name">${isBest?'⭐ ':''}${escHtml(name)}</div>
+          <div class="sf-carrier-meta">${escHtml(meta)}</div>
+        </div>
+        <div class="sf-carrier-price${isBest?' best':''}">${cost!=='—'?'$'+cost:'—'}${cur?`<span style="font-size:11px;color:var(--text3);margin-left:4px">${escHtml(cur)}</span>`:''}</div>
+        <button class="sf-carrier-btn" ${eligible?'':'disabled'} onclick="selectSfCarrier('${sid}','${mktId}',${o.wareHouseCarrierId},'${nameJs}',this)">Bu kargoya geç</button>
+      </div>`;
+    }).join('');
+    body.dataset.loaded = '1';
+  } catch (e) {
+    body.innerHTML = `<div style="color:var(--red);font-size:13px;padding:8px 0">❌ Hata: ${escHtml(e.message || String(e))}</div>`;
+  }
+}
+
+async function selectSfCarrier(sid, mktId, carrierId, name, btn) {
+  if (!confirm(`${name} kargosuna geçilsin mi?`)) return;
+  const serverUrl = getServerUrl();
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Geçiliyor...'; }
+  try {
+    const res  = await fetch(`${serverUrl}/sf/select-carrier`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sid, mktId, wareHouseCarrierId: carrierId }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Kargo değiştirilemedi');
+    const profit = data.preview && typeof data.preview.finalProfitAfterConversion === 'number'
+      ? ` — Yeni kâr $${data.preview.finalProfitAfterConversion.toFixed(2)}` : '';
+    showToast(`✅ ${name} kargosuna geçildi${profit}`, 'success');
+    // Butonu geri getir ki tekrar seçilebilsin
+    if (btn) { btn.disabled = false; btn.textContent = 'Bu kargoya geç'; }
+    await refreshAll();
+  } catch (e) {
+    showToast('❌ Hata: ' + (e.message || e), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Bu kargoya geç'; }
+  }
 }
 
 // Sunucuya giden tüm fetch çağrılarına otomatik Authorization header ekler
