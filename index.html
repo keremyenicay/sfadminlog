@@ -1520,18 +1520,40 @@ async function fetchAllData() {
 
 function refreshModalIfOpen() {
   const overlay = document.getElementById('modal-overlay');
-  if (overlay.classList.contains('open')) {
-    const sidElem = document.getElementById('modal-sid');
-    if (sidElem) {
-      const currentSid = sidElem.textContent;
-      const updatedOrder = _allOrders.find(o => o.sid === currentSid);
-      if (updatedOrder) {
-        openModal(updatedOrder); 
-      } else {
-        closeModal(); 
-      }
+  if (!overlay.classList.contains('open')) return;
+  const sidElem = document.getElementById('modal-sid');
+  if (!sidElem) return;
+  const currentSid = sidElem.textContent;
+  const updatedOrder = _allOrders.find(o => o.sid === currentSid);
+  // Sipariş listeden düştüyse modalı OTOMATİK kapatma — kullanıcı kendisi kapatsın.
+  // (Silme akışı doDelete kendi içinde closeModal çağırır.)
+  if (!updatedOrder) return;
+
+  // Açık kargo panellerini (SF + depolar) koru: modal yeniden kurulunca içerik + açık
+  // durum kaybolmasın (30 sn'lik otomatik yenileme paneli kapatmasın).
+  const PANEL_IDS = ['sf-carriers-body', 'wh-carriers-body-PREPLARGE', 'wh-carriers-body-COMFYSHIP', 'wh-carriers-body-FULLFILLONUS'];
+  const snap = [];
+  PANEL_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.style.display === 'block') {
+      snap.push({ id, html: el.innerHTML, loaded: el.dataset.loaded || '' });
     }
-  }
+  });
+
+  openModal(updatedOrder);
+
+  snap.forEach(s => {
+    const el = document.getElementById(s.id);
+    if (!el) return;
+    el.style.display = 'block';
+    el.innerHTML = s.html;
+    if (s.loaded) el.dataset.loaded = s.loaded;
+    const arrowId = s.id === 'sf-carriers-body'
+      ? 'sf-carriers-arrow'
+      : 'wh-carriers-arrow-' + s.id.replace('wh-carriers-body-', '');
+    const arrow = document.getElementById(arrowId);
+    if (arrow) arrow.style.transform = 'rotate(180deg)';
+  });
 }
 
 // ─── AMAZON LOG ───────────────────────────────────────────────────────────────
