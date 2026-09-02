@@ -2003,6 +2003,16 @@ function openModal(order) {
         <div style="color:var(--text3);font-size:13px;padding:8px 0">Yüklemek için başlığa tıkla.</div>
       </div>
     </div>
+    ${state==='priced' ? ['PREPLARGE','COMFYSHIP','FULLFILLONUS'].map(wh => `
+    <div class="sf-carriers">
+      <div class="sf-carriers-head" onclick="toggleWhCarriers('${order.sid}','${order.mktId}','${wh}')">
+        <span class="sf-carriers-title">📦 ${wh} Kargo Seçenekleri</span>
+        <span class="sf-carriers-toggle" id="wh-carriers-arrow-${wh}">▾</span>
+      </div>
+      <div class="sf-carriers-body" id="wh-carriers-body-${wh}" style="display:none">
+        <div style="color:var(--text3);font-size:13px;padding:8px 0">Yüklemek için başlığa tıkla (~2-4 sn).</div>
+      </div>
+    </div>`).join('') : ''}
     <div class="modal-actions">
       ${isPending ? `<div style="width:100%;text-align:center;padding:16px;color:var(--sf-orange);font-weight:700;font-family:var(--mono);background:rgba(255,123,0,0.1);border-radius:12px;">⏳ İşlem Devam Ediyor... Lütfen Bekleyin.</div>` : `
         ${state==='new' ? `<button class="act-btn btn-price" onclick="doPrice(event,'${order.sid}','${order.mktId}')">💰 Fiyat Al</button>` : ''}
@@ -2087,18 +2097,18 @@ async function doPrice(event, sid, mktId) {
   await refreshAll();
 }
 
-async function doOrder(event, sid, mktId, whName) {
+async function doOrder(event, sid, mktId, whName, wareHouseCarrierId = null, carrierName = null) {
   _pendingOps.add(sid);
   renderOrders();
   refreshModalIfOpen();
 
-  showToast(`📦 ${whName} seçildi: ${sid}`, 'success');
+  showToast(`📦 ${whName}${carrierName ? ' / ' + carrierName : ''} seçildi: ${sid}`, 'success');
   try {
     const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
     if (!raw) { _pendingOps.delete(sid); renderOrders(); refreshModalIfOpen(); return; }
     const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
     if (pending[sid]) {
-      pending[sid].adminOrderRequest = { whName, requestedAt: Date.now() };
+      pending[sid].adminOrderRequest = { whName, wareHouseCarrierId, carrierName, requestedAt: Date.now() };
       await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
 
       await waitForStateChange(sid, mktId, (o) => !!o.orderCode, 60000);
@@ -2460,6 +2470,74 @@ async function selectSfCarrier(sid, mktId, carrierId, name, btn) {
     showToast('❌ Hata: ' + (e.message || e), 'error');
     if (btn) { btn.disabled = false; btn.textContent = 'Bu kargoya geç'; }
   }
+}
+
+// ─── Depo (PREPLARGE/COMFYSHIP/FULLFILLONUS) Kargo Seçenekleri ──────────────────
+function toggleWhCarriers(sid, mktId, wh) {
+  const body  = document.getElementById(`wh-carriers-body-${wh}`);
+  const arrow = document.getElementById(`wh-carriers-arrow-${wh}`);
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  if (open) {
+    body.style.display = 'none';
+    if (arrow) arrow.style.transform = '';
+    return;
+  }
+  body.style.display = 'block';
+  if (arrow) arrow.style.transform = 'rotate(180deg)';
+  if (!body.dataset.loaded) loadWhCarriers(sid, mktId, wh);
+}
+
+async function loadWhCarriers(sid, mktId, wh) {
+  const body = document.getElementById(`wh-carriers-body-${wh}`);
+  if (!body) return;
+  const serverUrl = getServerUrl();
+  if (!serverUrl || !CFG.apiKey) {
+    body.innerHTML = `<div style="color:var(--red);font-size:13px;padding:8px 0">⚠️ Sunucu ayarlanmamış — Ayarlar'dan Sunucu URL ve API Key gir.</div>`;
+    return;
+  }
+  body.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:8px 0">⏳ Kargo seçenekleri yükleniyor (~2-4 sn)...</div>`;
+  try {
+    const res  = await fetch(`${serverUrl}/wh/carrier-options?wh=${encodeURIComponent(wh)}&sid=${encodeURIComponent(sid)}&mktId=${encodeURIComponent(mktId)}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Bilinmeyen hata');
+    const options = data.options || [];
+    if (!options.length) {
+      body.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:8px 0">Kargo seçeneği bulunamadı.</div>`;
+      return;
+    }
+    // En ucuz toplam (options zaten cargoPrice'a göre sıralı gelir)
+    let bestTotal = Infinity;
+    options.forEach(o => { if (typeof o.totalUSD === 'number' && o.totalUSD < bestTotal) bestTotal = o.totalUSD; });
+
+    body.innerHTML = options.map(o => {
+      const name    = o.carrierName || 'Kargo';
+      const svc     = o.serviceTypeName ? ` · ${o.serviceTypeName}` : '';
+      const total   = (typeof o.totalUSD === 'number') ? o.totalUSD.toFixed(2) : '—';
+      const cur     = o.currency || 'USD';
+      const isBest  = typeof o.totalUSD === 'number' && o.totalUSD === bestTotal;
+      const desc    = o.serviceTypeDescription || '';
+      const duty    = (typeof o.dutyFees === 'number' && o.dutyFees > 0) ? `Gümrük $${o.dutyFees.toFixed(2)}` : '';
+      const meta    = [desc, duty].filter(Boolean).join(' · ');
+      const nameJs  = String(name).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      return `<div class="sf-carrier-row${isBest?' best':''}">
+        <div class="sf-carrier-info">
+          <div class="sf-carrier-name">${isBest?'⭐ ':''}${escHtml(name)}${escHtml(svc)}</div>
+          ${meta ? `<div class="sf-carrier-meta">${escHtml(meta)}</div>` : ''}
+        </div>
+        <div class="sf-carrier-price${isBest?' best':''}">${total!=='—'?'$'+total:'—'}<span style="font-size:11px;color:var(--text3);margin-left:4px">${escHtml(cur)}</span></div>
+        <button class="sf-carrier-btn" onclick="selectWhCarrier('${sid}','${mktId}','${wh}',${o.wareHouseCarrierId},'${nameJs}',this)">Sipariş ver</button>
+      </div>`;
+    }).join('');
+    body.dataset.loaded = '1';
+  } catch (e) {
+    body.innerHTML = `<div style="color:var(--red);font-size:13px;padding:8px 0">❌ Hata: ${escHtml(e.message || String(e))}</div>`;
+  }
+}
+
+function selectWhCarrier(sid, mktId, wh, carrierId, name, btn) {
+  if (!confirm(`${name} ile ${wh} siparişi açılsın mı?`)) return;
+  doOrder(null, sid, mktId, wh, carrierId, name);
 }
 
 // Sunucuya giden tüm fetch çağrılarına otomatik Authorization header ekler
