@@ -847,6 +847,8 @@ td { padding: 16px 24px; vertical-align: middle; }
   color: var(--sf-orange); letter-spacing: 1px;
 }
 .sf-carriers-toggle { color: var(--text3); font-size: 14px; transition: transform .2s; }
+.sf-refresh-btn { background: transparent; border: none; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 6px; line-height: 1; }
+.sf-refresh-btn:hover { background: rgba(255,123,0,0.12); }
 .sf-carriers-body { padding: 4px 20px 18px; }
 .sf-carrier-row {
   display: flex; align-items: center; gap: 12px;
@@ -1953,6 +1955,12 @@ function openModal(order) {
   const shipText = isExpedited ? '🚀 Expedited (Hızlı)' : '📦 Standard';
   const shipColor = isExpedited ? 'color:#ea580c;font-weight:800;' : '';
 
+  // Fiyat aşamasında saklanan kargolar → panel açılınca ANINDA görünsün (canlı istek beklemeden)
+  const _sfCache = order.prices?.SF?.carriers;
+  const _placeholder = (t) => `<div style="color:var(--text3);font-size:13px;padding:8px 0">${t}</div>`;
+  const sfBodyInner  = (_sfCache && _sfCache.length) ? renderSfRows(order.sid, order.mktId, _sfCache) : _placeholder('Yüklemek için başlığa tıkla.');
+  const sfBodyLoaded = (_sfCache && _sfCache.length) ? ' data-loaded="1"' : '';
+
   document.getElementById('modal-content').innerHTML = `
     <div class="detail-grid">
       <div class="detail-item">
@@ -2019,22 +2027,28 @@ function openModal(order) {
     <div class="sf-carriers" id="sf-carriers-box">
       <div class="sf-carriers-head" onclick="toggleSfCarriers('${order.sid}','${order.mktId}')">
         <span class="sf-carriers-title">🚚 SF Kargo Seçenekleri</span>
-        <span class="sf-carriers-toggle" id="sf-carriers-arrow">▾</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <button class="sf-refresh-btn" onclick="event.stopPropagation();refreshSfCarriers('${order.sid}','${order.mktId}')" title="Canlı yenile">🔄</button>
+          <span class="sf-carriers-toggle" id="sf-carriers-arrow">▾</span>
+        </span>
       </div>
-      <div class="sf-carriers-body" id="sf-carriers-body" style="display:none">
-        <div style="color:var(--text3);font-size:13px;padding:8px 0">Yüklemek için başlığa tıkla.</div>
-      </div>
+      <div class="sf-carriers-body" id="sf-carriers-body" style="display:none"${sfBodyLoaded}>${sfBodyInner}</div>
     </div>
-    ${state==='priced' ? ['PREPLARGE','COMFYSHIP','FULLFILLONUS'].map(wh => `
+    ${state==='priced' ? ['PREPLARGE','COMFYSHIP','FULLFILLONUS'].map(wh => {
+      const _c = order.prices?.[wh]?.carriers;
+      const _inner  = (_c && _c.length) ? renderWhRows(order.sid, order.mktId, wh, _c) : _placeholder('Yüklemek için başlığa tıkla (~2-4 sn).');
+      const _loaded = (_c && _c.length) ? ' data-loaded="1"' : '';
+      return `
     <div class="sf-carriers">
       <div class="sf-carriers-head" onclick="toggleWhCarriers('${order.sid}','${order.mktId}','${wh}')">
         <span class="sf-carriers-title">📦 ${wh} Kargo Seçenekleri</span>
-        <span class="sf-carriers-toggle" id="wh-carriers-arrow-${wh}">▾</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <button class="sf-refresh-btn" onclick="event.stopPropagation();refreshWhCarriers('${order.sid}','${order.mktId}','${wh}')" title="Canlı yenile">🔄</button>
+          <span class="sf-carriers-toggle" id="wh-carriers-arrow-${wh}">▾</span>
+        </span>
       </div>
-      <div class="sf-carriers-body" id="wh-carriers-body-${wh}" style="display:none">
-        <div style="color:var(--text3);font-size:13px;padding:8px 0">Yüklemek için başlığa tıkla (~2-4 sn).</div>
-      </div>
-    </div>`).join('') : ''}
+      <div class="sf-carriers-body" id="wh-carriers-body-${wh}" style="display:none"${_loaded}>${_inner}</div>
+    </div>`;}).join('') : ''}
     <div class="modal-actions">
       ${isPending ? `<div style="width:100%;text-align:center;padding:16px;color:var(--sf-orange);font-weight:700;font-family:var(--mono);background:rgba(255,123,0,0.1);border-radius:12px;">⏳ İşlem Devam Ediyor... Lütfen Bekleyin.</div>` : `
         ${state==='new' ? `<button class="act-btn btn-price" onclick="doPrice(event,'${order.sid}','${order.mktId}')">💰 Fiyat Al</button>` : ''}
@@ -2420,6 +2434,53 @@ function toggleSfCarriers(sid, mktId) {
   if (!body.dataset.loaded) loadSfCarriers(sid, mktId);
 }
 
+// "🔄 Yenile" — paneli açıp canlı (taze) veriyle yeniden yükle
+function refreshSfCarriers(sid, mktId) {
+  const body = document.getElementById('sf-carriers-body');
+  const arrow = document.getElementById('sf-carriers-arrow');
+  if (body) body.style.display = 'block';
+  if (arrow) arrow.style.transform = 'rotate(180deg)';
+  loadSfCarriers(sid, mktId);
+}
+function refreshWhCarriers(sid, mktId, wh) {
+  const body = document.getElementById(`wh-carriers-body-${wh}`);
+  const arrow = document.getElementById(`wh-carriers-arrow-${wh}`);
+  if (body) body.style.display = 'block';
+  if (arrow) arrow.style.transform = 'rotate(180deg)';
+  loadWhCarriers(sid, mktId, wh);
+}
+
+// SF kargo satırlarını HTML'e çevir (hem cache hem canlı yolda kullanılır)
+function renderSfRows(sid, mktId, options) {
+  if (!options || !options.length) {
+    return `<div style="color:var(--text3);font-size:13px;padding:8px 0">Kargo seçeneği bulunamadı.</div>`;
+  }
+  let bestCost = Infinity;
+  options.forEach(o => { if (o.isEligibleToSend && typeof o.shippingCost === 'number' && o.shippingCost < bestCost) bestCost = o.shippingCost; });
+  return options.map(o => {
+    const name    = o.carrierName || 'Kargo';
+    const cur     = o.currency || '';
+    const cost    = (typeof o.shippingCost === 'number') ? o.shippingCost.toFixed(2) : '—';
+    const isBest  = o.isEligibleToSend && o.shippingCost === bestCost;
+    const deliv   = (o.minDeliveryDate != null && o.maxDeliveryDate != null) ? `${o.minDeliveryDate}–${o.maxDeliveryDate} gün` : '';
+    const profit  = (typeof o.finalProfitUSD === 'number') ? `Kâr $${o.finalProfitUSD.toFixed(2)}` : '';
+    const eligible = o.isEligibleToSend !== false;
+    const nameJs  = String(name).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const logo    = o.carrierLogoUrl ? String(o.carrierLogoUrl).trim() : '';
+    const logoHtml = logo ? `<img class="sf-carrier-logo" src="${escHtml(logo)}" alt="" onerror="this.style.display='none'">` : `<div class="sf-carrier-logo"></div>`;
+    const meta    = [deliv, profit].filter(Boolean).join(' · ') + (eligible ? '' : ' · ⚠️ Uygun değil');
+    return `<div class="sf-carrier-row${isBest?' best':''}${eligible?'':' ineligible'}">
+      ${logoHtml}
+      <div class="sf-carrier-info">
+        <div class="sf-carrier-name">${isBest?'⭐ ':''}${escHtml(name)}</div>
+        <div class="sf-carrier-meta">${escHtml(meta)}</div>
+      </div>
+      <div class="sf-carrier-price${isBest?' best':''}">${cost!=='—'?'$'+cost:'—'}${cur?`<span style="font-size:11px;color:var(--text3);margin-left:4px">${escHtml(cur)}</span>`:''}</div>
+      <button class="sf-carrier-btn" ${eligible?'':'disabled'} onclick="selectSfCarrier('${sid}','${mktId}',${o.wareHouseCarrierId},'${nameJs}',this)">Bu kargoya geç</button>
+    </div>`;
+  }).join('');
+}
+
 async function loadSfCarriers(sid, mktId) {
   const body = document.getElementById('sf-carriers-body');
   if (!body) return;
@@ -2433,37 +2494,7 @@ async function loadSfCarriers(sid, mktId) {
     const res  = await fetch(`${serverUrl}/sf/sending-options?sid=${encodeURIComponent(sid)}&mktId=${encodeURIComponent(mktId)}`);
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Bilinmeyen hata');
-    const options = data.options || [];
-    if (!options.length) {
-      body.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:8px 0">Kargo seçeneği bulunamadı.</div>`;
-      return;
-    }
-    // En ucuz uygun seçeneği bul
-    let bestCost = Infinity;
-    options.forEach(o => { if (o.isEligibleToSend && typeof o.shippingCost === 'number' && o.shippingCost < bestCost) bestCost = o.shippingCost; });
-
-    body.innerHTML = options.map(o => {
-      const name    = o.carrierName || 'Kargo';
-      const cur     = o.currency || '';
-      const cost    = (typeof o.shippingCost === 'number') ? o.shippingCost.toFixed(2) : '—';
-      const isBest  = o.isEligibleToSend && o.shippingCost === bestCost;
-      const deliv   = (o.minDeliveryDate != null && o.maxDeliveryDate != null) ? `${o.minDeliveryDate}–${o.maxDeliveryDate} gün` : '';
-      const profit  = (typeof o.finalProfitUSD === 'number') ? `Kâr $${o.finalProfitUSD.toFixed(2)}` : '';
-      const eligible = o.isEligibleToSend !== false;
-      const nameJs  = String(name).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-      const logo    = o.carrierLogoUrl ? String(o.carrierLogoUrl).trim() : '';
-      const logoHtml = logo ? `<img class="sf-carrier-logo" src="${escHtml(logo)}" alt="" onerror="this.style.display='none'">` : `<div class="sf-carrier-logo"></div>`;
-      const meta    = [deliv, profit].filter(Boolean).join(' · ') + (eligible ? '' : ' · ⚠️ Uygun değil');
-      return `<div class="sf-carrier-row${isBest?' best':''}${eligible?'':' ineligible'}">
-        ${logoHtml}
-        <div class="sf-carrier-info">
-          <div class="sf-carrier-name">${isBest?'⭐ ':''}${escHtml(name)}</div>
-          <div class="sf-carrier-meta">${escHtml(meta)}</div>
-        </div>
-        <div class="sf-carrier-price${isBest?' best':''}">${cost!=='—'?'$'+cost:'—'}${cur?`<span style="font-size:11px;color:var(--text3);margin-left:4px">${escHtml(cur)}</span>`:''}</div>
-        <button class="sf-carrier-btn" ${eligible?'':'disabled'} onclick="selectSfCarrier('${sid}','${mktId}',${o.wareHouseCarrierId},'${nameJs}',this)">Bu kargoya geç</button>
-      </div>`;
-    }).join('');
+    body.innerHTML = renderSfRows(sid, mktId, data.options || []);
     body.dataset.loaded = '1';
   } catch (e) {
     body.innerHTML = `<div style="color:var(--red);font-size:13px;padding:8px 0">❌ Hata: ${escHtml(e.message || String(e))}</div>`;
@@ -2510,6 +2541,34 @@ function toggleWhCarriers(sid, mktId, wh) {
   if (!body.dataset.loaded) loadWhCarriers(sid, mktId, wh);
 }
 
+// Depo kargo satırlarını HTML'e çevir (hem cache hem canlı yolda kullanılır)
+function renderWhRows(sid, mktId, wh, options) {
+  if (!options || !options.length) {
+    return `<div style="color:var(--text3);font-size:13px;padding:8px 0">Kargo seçeneği bulunamadı.</div>`;
+  }
+  let bestTotal = Infinity;
+  options.forEach(o => { if (typeof o.totalUSD === 'number' && o.totalUSD < bestTotal) bestTotal = o.totalUSD; });
+  return options.map(o => {
+    const name    = o.carrierName || 'Kargo';
+    const svc     = o.serviceTypeName ? ` · ${o.serviceTypeName}` : '';
+    const total   = (typeof o.totalUSD === 'number') ? o.totalUSD.toFixed(2) : '—';
+    const cur     = o.currency || 'USD';
+    const isBest  = typeof o.totalUSD === 'number' && o.totalUSD === bestTotal;
+    const desc    = o.serviceTypeDescription || '';
+    const duty    = (typeof o.dutyFees === 'number' && o.dutyFees > 0) ? `Gümrük $${o.dutyFees.toFixed(2)}` : '';
+    const meta    = [desc, duty].filter(Boolean).join(' · ');
+    const nameJs  = String(name).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return `<div class="sf-carrier-row${isBest?' best':''}">
+      <div class="sf-carrier-info">
+        <div class="sf-carrier-name">${isBest?'⭐ ':''}${escHtml(name)}${escHtml(svc)}</div>
+        ${meta ? `<div class="sf-carrier-meta">${escHtml(meta)}</div>` : ''}
+      </div>
+      <div class="sf-carrier-price${isBest?' best':''}">${total!=='—'?'$'+total:'—'}<span style="font-size:11px;color:var(--text3);margin-left:4px">${escHtml(cur)}</span></div>
+      <button class="sf-carrier-btn" onclick="selectWhCarrier('${sid}','${mktId}','${wh}',${o.wareHouseCarrierId},'${nameJs}',this)">Sipariş ver</button>
+    </div>`;
+  }).join('');
+}
+
 async function loadWhCarriers(sid, mktId, wh) {
   const body = document.getElementById(`wh-carriers-body-${wh}`);
   if (!body) return;
@@ -2523,34 +2582,7 @@ async function loadWhCarriers(sid, mktId, wh) {
     const res  = await fetch(`${serverUrl}/wh/carrier-options?wh=${encodeURIComponent(wh)}&sid=${encodeURIComponent(sid)}&mktId=${encodeURIComponent(mktId)}`);
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Bilinmeyen hata');
-    const options = data.options || [];
-    if (!options.length) {
-      body.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:8px 0">Kargo seçeneği bulunamadı.</div>`;
-      return;
-    }
-    // En ucuz toplam (options zaten cargoPrice'a göre sıralı gelir)
-    let bestTotal = Infinity;
-    options.forEach(o => { if (typeof o.totalUSD === 'number' && o.totalUSD < bestTotal) bestTotal = o.totalUSD; });
-
-    body.innerHTML = options.map(o => {
-      const name    = o.carrierName || 'Kargo';
-      const svc     = o.serviceTypeName ? ` · ${o.serviceTypeName}` : '';
-      const total   = (typeof o.totalUSD === 'number') ? o.totalUSD.toFixed(2) : '—';
-      const cur     = o.currency || 'USD';
-      const isBest  = typeof o.totalUSD === 'number' && o.totalUSD === bestTotal;
-      const desc    = o.serviceTypeDescription || '';
-      const duty    = (typeof o.dutyFees === 'number' && o.dutyFees > 0) ? `Gümrük $${o.dutyFees.toFixed(2)}` : '';
-      const meta    = [desc, duty].filter(Boolean).join(' · ');
-      const nameJs  = String(name).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-      return `<div class="sf-carrier-row${isBest?' best':''}">
-        <div class="sf-carrier-info">
-          <div class="sf-carrier-name">${isBest?'⭐ ':''}${escHtml(name)}${escHtml(svc)}</div>
-          ${meta ? `<div class="sf-carrier-meta">${escHtml(meta)}</div>` : ''}
-        </div>
-        <div class="sf-carrier-price${isBest?' best':''}">${total!=='—'?'$'+total:'—'}<span style="font-size:11px;color:var(--text3);margin-left:4px">${escHtml(cur)}</span></div>
-        <button class="sf-carrier-btn" onclick="selectWhCarrier('${sid}','${mktId}','${wh}',${o.wareHouseCarrierId},'${nameJs}',this)">Sipariş ver</button>
-      </div>`;
-    }).join('');
+    body.innerHTML = renderWhRows(sid, mktId, wh, data.options || []);
     body.dataset.loaded = '1';
   } catch (e) {
     body.innerHTML = `<div style="color:var(--red);font-size:13px;padding:8px 0">❌ Hata: ${escHtml(e.message || String(e))}</div>`;
