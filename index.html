@@ -1120,7 +1120,12 @@ td { padding: 16px 24px; vertical-align: middle; }
   <div style="max-width:780px;margin:0 auto;padding:16px 16px calc(16px + var(--safe-bot));">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
       <button class="cmd-btn" onclick="scanMessages(this)" style="background:#2563eb;color:#fff;">🔄 Mesajları Tara</button>
-      <div id="msg-filter" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      <div id="msg-filter" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;"></div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <input id="msg-search" type="text" placeholder="🔎 Order ID ile mesaj ara..." autocomplete="off" autocorrect="off" autocapitalize="off"
+             oninput="setMsgSearch(this.value)"
+             style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:var(--bg1);color:var(--text);">
     </div>
     <div id="msg-list"></div>
     <div id="msg-empty" style="display:none;text-align:center;padding:40px 16px;color:var(--text3);font-size:14px;">Bekleyen mesaj yok. "Mesajları Tara" ile kontrol et.</div>
@@ -2654,6 +2659,7 @@ async function triggerCmdAll(cmd, btn) {
 let _msgPanelOpen = false;
 let _msgQueues    = {};        // mktId -> { id: {...} }
 let _msgFilter    = 'pending'; // pending | all
+let _msgSearch    = '';        // order id arama terimi (lowercase)
 
 const INTENT_META = {
   tracking:          { tr: 'Kargo Takibi',     emoji: '📦', color: '#2563eb' },
@@ -2840,16 +2846,25 @@ function renderMsgPanel() {
       if (h != null && h > 24) overdue++;
     }
   }
+  const clearLabel = _msgFilter === 'all' ? '🗑 Tümünü Temizle' : '🗑 Bekleyenleri Temizle';
   filt.innerHTML = `
     <button class="profit-period-btn ${_msgFilter==='pending'?'active':''}" onclick="setMsgFilter('pending',this)">Bekleyen</button>
     <button class="profit-period-btn ${_msgFilter==='all'?'active':''}" onclick="setMsgFilter('all',this)">Tümü</button>
-    <span style="font-size:12px;color:var(--text3);align-self:center;margin-left:4px;">${totalPending} bekliyor${overdue ? ` · <b style="color:#dc2626;">${overdue} tanesi 24 saati geçti</b>` : ''}</span>`;
+    <span style="font-size:12px;color:var(--text3);align-self:center;margin-left:4px;">${totalPending} bekliyor${overdue ? ` · <b style="color:#dc2626;">${overdue} tanesi 24 saati geçti</b>` : ''}</span>
+    <button class="cmd-btn" style="background:#fee2e2;color:#dc2626;font-weight:600;margin-left:auto;align-self:center;" onclick="clearAllMsgs()">${clearLabel}</button>`;
 
+  const searching = _msgSearch.length > 0;
   const rows = [];
   for (const mktId of Object.keys(_msgQueues)) {
     for (const [id, m] of Object.entries(_msgQueues[mktId] || {})) {
       const status = m.status || 'pending';
-      if (_msgFilter === 'pending' && status !== 'pending') continue;
+      if (searching) {
+        // Arama modunda sekme filtresini yoksay, tüm statülerde order id ile eşleştir
+        const hay = `${m.amazonOrderId || ''} ${m.sellerOrderId || ''}`.toLowerCase();
+        if (!hay.includes(_msgSearch)) continue;
+      } else if (_msgFilter === 'pending' && status !== 'pending') {
+        continue;
+      }
       rows.push({ mktId, id, ...m });
     }
   }
@@ -2862,7 +2877,14 @@ function renderMsgPanel() {
     return (b.createdAt || 0) - (a.createdAt || 0);
   });
 
-  if (!rows.length) { list.innerHTML = ''; empty.style.display = 'block'; return; }
+  if (!rows.length) {
+    list.innerHTML = '';
+    empty.textContent = searching
+      ? 'Bu order id ile mesaj bulunamadı.'
+      : 'Bekleyen mesaj yok. "Mesajları Tara" ile kontrol et.';
+    empty.style.display = 'block';
+    return;
+  }
   empty.style.display = 'none';
 
   list.innerHTML = rows.map(r => {
@@ -2931,6 +2953,33 @@ function renderMsgPanel() {
 
 function setMsgFilter(f, btn) {
   _msgFilter = f;
+  renderMsgPanel();
+}
+
+function setMsgSearch(v) {
+  _msgSearch = (v || '').trim().toLowerCase();
+  renderMsgPanel();
+}
+
+async function clearAllMsgs() {
+  const scope = _msgFilter === 'all' ? 'all' : 'pending';
+  const msg = scope === 'all'
+    ? 'TÜM mesaj geçmişi silinecek. Emin misin?'
+    : 'Bekleyen tüm mesajlar yoksayılacak (panelden kalkacak, tekrar taramada gelmez). Emin misin?';
+  if (!confirm(msg)) return;
+  const serverUrl = getServerUrl();
+  try {
+    const res = await fetch(`${serverUrl}/messages/clear`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mktId: null, scope })
+    });
+    const d = await res.json();
+    if (d.ok) showCmdResult(`${d.cleared || 0} mesaj temizlendi`);
+    else showCmdResult(d.error || 'Temizleme hatası', false);
+  } catch (e) {
+    showCmdResult(`Bağlantı hatası: ${e.message}`, false);
+  }
+  await loadMsgQueues();
   renderMsgPanel();
 }
 
