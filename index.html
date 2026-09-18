@@ -2071,7 +2071,8 @@ function openModal(order) {
             return `<div style="padding:12px 16px;background:rgba(255,123,0,0.1);border:1px solid rgba(255,123,0,0.25);border-radius:12px;text-align:center;font-weight:700;color:var(--sf-orange)">🕒 Sıra #${qIdx + 1} — Bekleniyor</div>
                     <button class="act-btn btn-cancel" onclick="doCancelQueue('${order.sid}','${order.mktId}')">✕ Sıradan Çıkar</button>`;
           }
-          return `<button class="act-btn btn-amazon" onclick="doAmazon(event,'${order.sid}','${order.mktId}')">🛒 Amazon'a Geç</button>`;
+          return `<button class="act-btn btn-amazon" onclick="doAmazon(event,'${order.sid}','${order.mktId}')">🛒 Amazon'a Geç</button>
+                  <button class="act-btn btn-cancel" onclick="changeWarehouse('${order.sid}','${order.mktId}')" style="background:rgba(2,132,199,0.1);color:var(--seller-blue);border-color:rgba(2,132,199,0.25)">🔄 Depo Değiştir</button>`;
         })() : ''}
         ${state==='amazon' ? (() => {
           const isActive = _activeAmazonJob && _activeAmazonJob.sid === order.sid &&
@@ -2273,6 +2274,60 @@ async function clearWhError(sid, mktId) {
       await refreshAll();
     }
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
+}
+
+async function changeWarehouse(sid, mktId) {
+  // Mevcut depo bilgisini oku
+  let whName = '', orderCode = '', bid = '';
+  try {
+    const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
+    const pending = raw ? ((typeof raw === 'object') ? raw : JSON.parse(raw)) : {};
+    const o = pending[sid];
+    if (!o || !o.whName) { showToast('Bu siparişte değiştirilecek depo yok', 'error'); return; }
+    whName = o.whName; orderCode = o.orderCode || ''; bid = o.bid || '';
+  } catch(e) { showToast('Hata: ' + e.message, 'error'); return; }
+
+  const msg = whName === 'SF'
+    ? `SF kodu silinecek ve başka depo seçebileceksin. Onaylıyor musun?`
+    : `⚠️ ${whName} deposundaki ${orderCode} gönderisi İPTAL edilecek ve başka depo seçebileceksin. Onaylıyor musun?`;
+  if (!confirm(msg)) return;
+
+  _pendingOps.add(sid);
+  renderOrders();
+  refreshModalIfOpen();
+
+  try {
+    const serverUrl = getServerUrl();
+    const res = await fetch(`${serverUrl}/wh/cancel`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mktId, sid, whName, orderCode, orderNo: bid })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast('Depo iptali başarısız: ' + (data.error || 'bilinmeyen hata'), 'error');
+      _pendingOps.delete(sid); renderOrders(); refreshModalIfOpen();
+      return;
+    }
+    // Başarılı: pending'de depo alanlarını temizle → sipariş "Fiyatlı" duruma döner (fiyatlar kalır)
+    const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
+    if (raw) {
+      const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
+      if (pending[sid]) {
+        delete pending[sid].whName;
+        delete pending[sid].orderCode;
+        delete pending[sid].priceUSD;
+        delete pending[sid].currency;
+        await sbPut(`ORDER_BOT_PENDING_${mktId}`, JSON.stringify(pending));
+      }
+    }
+    showToast('Depo iptal edildi — yeni depo seçebilirsin', 'success');
+  } catch(e) {
+    showToast('Bağlantı hatası: ' + e.message, 'error');
+  }
+
+  _pendingOps.delete(sid);
+  await refreshAll();
+  refreshModalIfOpen();
 }
 
 async function doDelete(sid, mktId) {
