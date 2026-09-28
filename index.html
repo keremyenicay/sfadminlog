@@ -3541,6 +3541,17 @@ function toggleSearchPanel() {
   }
 }
 
+// Siparişin gittiği depo kodunu bul: pending.orderCode → DB.orderCode → DB.warehouseId (kod formatındaysa) → Shippinglot shipmentId
+function _searchWhCode(o, p) {
+  const isCode = v => typeof v === 'string' && /^(DRP|CS|LMG|SF)-\S+/i.test(v.trim());
+  for (const v of [p && p.orderCode, o && o.orderCode, o && o.warehouseId]) {
+    if (isCode(v)) return v.trim().toUpperCase();
+  }
+  const wh = String((o && (o.warehouse || o.whName)) || (p && p.whName) || '').toUpperCase();
+  if (o && o.shipmentId && (wh.includes('SHIPPINGLOT') || wh === 'SF')) return 'SF-' + o.shipmentId;
+  return '';
+}
+
 async function runSearch() {
   const query = (document.getElementById('search-input').value || '').trim().toLowerCase();
   const resultEl = document.getElementById('search-results');
@@ -3556,9 +3567,17 @@ async function runSearch() {
     try {
       const data = await sbGet(`DB_${mktId}`);
       if (!data || typeof data !== 'object') continue;
-      for (const [sid, o] of Object.entries(data)) {
+      // Depo kodu (DRP-/CS-/LMG-/SF-) order-bot pending kaydında tutuluyor
+      let pending = {};
+      try {
+        const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
+        if (raw) pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
+      } catch(e) { pending = {}; }
+      for (const [sid, o0] of Object.entries(data)) {
+        const o = { ...o0, whCode: _searchWhCode(o0, pending[sid]) };
         const haystack = [
           sid,
+          o.whCode,
           o.buyerOrderId,
           o.whTracking,
           o.amazonTrackingId,
@@ -3608,7 +3627,7 @@ async function runSearch() {
       <div class="search-card-grid">
         <div class="search-card-field">
           <span class="search-card-label">Depo</span>
-          <span class="search-card-val">${o.warehouse || o.warehouseId || '—'}</span>
+          <span class="search-card-val">${(() => { const name = o.warehouse || o.whName || ''; if (!o.whCode) return name || o.warehouseId || '—'; const code = `<span style="color:var(--seller-blue);font-weight:700;">${o.whCode}</span>`; return name ? `${name} · ${code}` : code; })()}</span>
         </div>
         <div class="search-card-field">
           <span class="search-card-label">Kargo</span>
