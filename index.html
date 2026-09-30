@@ -1036,6 +1036,17 @@ td { padding: 16px 24px; vertical-align: middle; }
 .rt-amz-msg{font-size:11px;color:var(--text3);margin-top:2px;}
 .rt-money{text-align:right;font-family:var(--mono);font-size:12px;color:var(--text2);white-space:nowrap;}
 .rt-money b{font-size:15px;}
+.rt-trk{margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:linear-gradient(180deg,#f8fafc,#fff);}
+.rt-trk-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
+.rt-trk-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);}
+.rt-trk-stage{font-size:13px;font-weight:800;color:#0f172a;}
+.rt-trk-warn{font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;}
+.rt-trk-warn.ok{background:#ecfdf5;color:#047857;border-color:#a7f3d0;}
+.rt-trk-sub{font-size:11px;color:var(--text3);margin-top:6px;display:flex;flex-wrap:wrap;gap:4px 12px;}
+.rt-trk-sub b{color:var(--text2);}
+.rt-trk .rt-step.cur .rt-step-l{color:#7c3aed;}
+.rt-trk .rt-step.cur::after{box-shadow:0 0 0 4px rgba(124,58,237,.18);}
+.rt-trk .rt-step.est .rt-step-d{font-style:italic;opacity:.75;}
 .rt-tl{display:flex;gap:0;margin-top:10px;overflow-x:auto;padding-bottom:2px;}
 .rt-step{flex:1;min-width:92px;position:relative;padding-top:14px;text-align:center;}
 .rt-step::before{content:'';position:absolute;top:5px;left:0;right:0;height:2px;background:var(--bg4);}
@@ -1244,6 +1255,15 @@ td { padding: 16px 24px; vertical-align: middle; }
         <option value="transit">Müşteri kargoda</option>
         <option value="atwh">Depoya ulaştı</option>
         <option value="sent">Depodan Amazon'a çıktı</option>
+      </select>
+      <select class="rt-select" onchange="_rtAmz=this.value;renderReturnsList()">
+        <option value="all">.com iade süreci: Tümü</option>
+        <option value="INITIATED">📄 Etiket kullanılmadı</option>
+        <option value="IN_TRANSIT">🚚 İade kargoda</option>
+        <option value="RECEIVED">📥 Amazon teslim aldı</option>
+        <option value="REFUNDING">💳 Para iadesi işleniyor</option>
+        <option value="DELAYED">⚠️ Gecikmeli</option>
+        <option value="NOTRACK">❔ Takip bilgisi yok</option>
       </select>
       <select class="rt-select" onchange="_rtSort=this.value;renderReturnsList()">
         <option value="priority">Sıralama: Öncelik</option>
@@ -3834,6 +3854,27 @@ let _rtMkt       = null;
 let _rtStatus    = 'all';
 let _rtSf        = 'all';
 let _rtSort      = 'priority';
+let _rtAmz       = 'all';
+const RT_LABEL_UNUSED_DAYS = 7;
+
+// .com iade takip aşaması (View return/refund status sayfasından)
+const RT_AMZ_STAGE = {
+  INITIATED:       { label: 'Etiket Kullanılmadı',     icon: '📄', c: '#b45309', cb: '#fffbeb' },
+  IN_TRANSIT:      { label: '.com İadesi Kargoda',     icon: '🚚', c: '#7c3aed', cb: '#f5f3ff' },
+  RECEIVED:        { label: 'Amazon Teslim Aldı',      icon: '📥', c: '#0284c7', cb: '#f0f9ff' },
+  REFUND_ISSUED:   { label: 'Para İadesi İşleniyor',   icon: '💳', c: '#0d9488', cb: '#f0fdfa' },
+  REFUND_CREDITED: { label: 'Para İadesi İşleniyor',   icon: '💳', c: '#0d9488', cb: '#f0fdfa' },
+};
+function rtTracking(r) { const t = r.amazon && r.amazon.tracking; return (t && (t.milestones || []).length) ? t : null; }
+function rtAmzStageKey(r) {
+  const t = rtTracking(r); if (!t) return null;
+  return t.stageKey === 'REFUND_CREDITED' ? 'REFUND_ISSUED' : t.stageKey;
+}
+function rtIsDelayed(r) { const t = r.amazon && r.amazon.tracking; return !!(t && t.bannerLevel === 'warning' && /delay|late|gecik/i.test(t.banner || '')); }
+function rtLabelUnusedDays(r) {
+  if (rtAmzStageKey(r) !== 'INITIATED' || !r.returnStartedAt) return null;
+  return Math.floor((Date.now() - _rtTs(r.returnStartedAt)) / 86400000);
+}
 let _rtSearch    = '';
 const RT_ALERT_DAYS = 2;
 
@@ -4025,6 +4066,10 @@ function rtFiltered() {
   else if (_rtStatus === 'REFUNDED') list = list.filter(r => ['REFUNDED', 'PARTIAL'].includes(rtVerdict(r).key));
   else if (_rtStatus !== 'all') list = list.filter(r => rtVerdict(r).key === _rtStatus);
   if (_rtSf !== 'all') list = list.filter(r => rtSfStage(r).key === _rtSf);
+  if (_rtAmz === 'DELAYED') list = list.filter(rtIsDelayed);
+  else if (_rtAmz === 'NOTRACK') list = list.filter(r => rtVerdict(r).key === 'RETURN_STARTED' && !rtTracking(r));
+  else if (_rtAmz === 'REFUNDING') list = list.filter(r => rtVerdict(r).key === 'RETURN_STARTED' && rtAmzStageKey(r) === 'REFUND_ISSUED');
+  else if (_rtAmz !== 'all') list = list.filter(r => rtVerdict(r).key === 'RETURN_STARTED' && rtAmzStageKey(r) === _rtAmz);
   const q = _rtSearch.trim().toLowerCase();
   if (q) list = list.filter(r => [r.sid, r.buyerOrderId, r.asin, r.trackingNumber, r.rmaNumber, r.amazon?.rmaId, r.carrier, _rtStores[r.mktId]]
     .some(v => v && String(v).toLowerCase().includes(q)));
@@ -4109,9 +4154,14 @@ function rtItemHtml(r) {
         </div>
       </div>
       <div class="rt-side">
-        <span class="rt-verdict" style="--c:${v.c};--cb:${v.cb}">${v.icon} ${v.label}</span>
+        ${(() => { const st = v.key === 'RETURN_STARTED' && RT_AMZ_STAGE[rtAmzStageKey(r)];
+          return st ? `<span class="rt-verdict" style="--c:${st.c};--cb:${st.cb}">${st.icon} ${st.label}</span>`
+                    : `<span class="rt-verdict" style="--c:${v.c};--cb:${v.cb}">${v.icon} ${v.label}</span>`; })()}
+        ${rtIsDelayed(r) ? `<span class="rt-pill" style="color:#c2410c;background:#fff7ed">⚠️ .com iadesi gecikmeli</span>` : ''}
         <span class="rt-pill" style="color:${sf.c};background:${sf.c}14">SF: ${sf.label}</span>
-        <span class="rt-age${late ? ' bad' : ''}">${age !== null ? (late ? `⏰ ${age} gündür .com iadesi yok` : `${age} gün önce açıldı`) : ''}</span>
+        ${(() => { const lu = rtLabelUnusedDays(r);
+          if (lu !== null && lu >= RT_LABEL_UNUSED_DAYS) return `<span class="rt-age bad">⏰ ${lu} gündür .com etiketi kullanılmadı</span>`;
+          return `<span class="rt-age${late ? ' bad' : ''}">${age !== null ? (late ? `⏰ ${age} gündür .com iadesi yok` : `${age} gün önce açıldı`) : ''}</span>`; })()}
       </div>
     </div>
     <div class="rt-amz">
@@ -4122,6 +4172,7 @@ function rtItemHtml(r) {
       </div>
       ${money}
     </div>
+    ${rtTrackingHtml(r)}
     <div class="rt-tl">${tl}</div>
     <div class="rt-foot">
       ${amzUrl ? `<a class="rt-link" href="${amzUrl}" target="_blank" rel="noopener">🛒 .com Siparişi</a>` : ''}
@@ -4136,6 +4187,44 @@ function rtItemHtml(r) {
       <span class="rt-checked">${a.checkedAt ? `.com kontrol: ${_rtAgo(a.checkedAt)}` : '.com kontrol: —'}</span>
     </div>
   </div>`;
+}
+
+const RT_STAGE_TR = { 'Initiated': 'İade başlatıldı', 'Dropped off': 'Kargoya bırakıldı', 'In transit': 'Yolda', 'Return received': 'Amazon teslim aldı', 'Refund issued': 'Para iadesi yapıldı', 'Refund credited': 'Hesaba geçti' };
+function rtTrackingHtml(r) {
+  const a = r.amazon || {};
+  const t = a.tracking;
+  if (!t) {
+    if (rtVerdict(r).key !== 'RETURN_STARTED') return '';
+    return `<div class="rt-trk"><div class="rt-trk-head"><span class="rt-trk-title">.com İade Takibi</span>
+      <span style="font-size:11px;color:var(--text3)">Henüz takip bilgisi alınmadı — “Şimdi Kontrol Et” ile çekilir.</span></div></div>`;
+  }
+  const ms = t.milestones || [];
+  if (!ms.length) {
+    return `<div class="rt-trk"><div class="rt-trk-head"><span class="rt-trk-title">.com İade Takibi</span>
+      <span style="font-size:11px;color:#b45309">${_rtEsc(t.error || 'Takip bilgisi yok')}</span></div></div>`;
+  }
+  const steps = ms.map(m => `
+    <div class="rt-step${m.completed ? ' done' : ''}${m.current ? ' cur' : ''}${m.estimated ? ' est' : ''}" style="--sc:#7c3aed" title="${_rtEsc(m.desc || '')}">
+      <div class="rt-step-l">${_rtEsc(RT_STAGE_TR[m.title] || m.title)}</div>
+      <div class="rt-step-d">${m.date ? _rtEsc(m.date) + (m.estimated ? ' · tahmini' : '') : '·'}</div>
+    </div>`).join('');
+  const warn = t.banner && t.bannerLevel && t.bannerLevel !== 'info'
+    ? `<span class="rt-trk-warn${t.bannerLevel === 'success' ? ' ok' : ''}">${t.bannerLevel === 'success' ? '✅' : '⚠️'} ${_rtEsc(t.banner)}</span>` : '';
+  const stageTr = RT_STAGE_TR[t.stage] || t.stage || '';
+  return `
+    <div class="rt-trk">
+      <div class="rt-trk-head">
+        <span class="rt-trk-title">.com İade Takibi</span>
+        ${stageTr ? `<span class="rt-trk-stage">${_rtEsc(stageTr)}${t.stageDate ? ` · ${_rtEsc(t.stageDate)}` : ''}</span>` : ''}
+        ${warn}
+      </div>
+      <div class="rt-tl" style="margin-top:4px">${steps}</div>
+      <div class="rt-trk-sub">
+        ${t.stageDesc ? `<span>📍 ${_rtEsc(t.stageDesc)}</span>` : ''}
+        ${t.reason ? `<span>İade nedeni: <b>${_rtEsc(t.reason)}</b></span>` : ''}
+        <span>takip kontrol: ${_rtAgo(t.checkedAt)}${t.error ? ` · <span style="color:#b45309">${_rtEsc(t.error)}</span>` : ''}</span>
+      </div>
+    </div>`;
 }
 
 function rtCopy(t) {
@@ -4272,7 +4361,7 @@ async function dismissReturns(items, restore = false) {
 
 function exportReturnsCsv() {
   const rows = rtFiltered();
-  const head = ['Mağaza','Seller Order','Buyer Order','ASIN','SF İade Tarihi','SF Süreç','Kargo','Takip No','SF RMA','SF Ücret','SF Ödendi','Depoya Ulaştı','Depodan Çıktı','.com Durum','.com Başlık','.com RMA','Sipariş Tutarı','İade Tutarı','Kısmi','.com Kontrol','Gün'];
+  const head = ['Mağaza','Seller Order','Buyer Order','ASIN','SF İade Tarihi','SF Süreç','Kargo','Takip No','SF RMA','SF Ücret','SF Ödendi','Depoya Ulaştı','Depodan Çıktı','.com Durum','.com Başlık','.com RMA','Sipariş Tutarı','İade Tutarı','Kısmi','.com İade Aşaması','Aşama Tarihi','.com Uyarı','İade Nedeni','.com Kontrol','Gün'];
   const q = v => { const s = String(v ?? ''); return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const lines = [head.join(';')].concat(rows.map(r => {
     const a = r.amazon || {};
@@ -4281,6 +4370,7 @@ function exportReturnsCsv() {
       r.carrier, r.trackingNumber, r.rmaNumber, r.totalCharge, r.isPaid ? 'Evet' : 'Hayır',
       _rtDate(r.warehouseDeliveryDate, true), _rtDate(r.warehouseSentDate, true),
       rtVerdict(r).label, a.statusTitle, a.rmaId, a.grandTotal, a.refundTotal, a.partial ? 'Evet' : '',
+      a.tracking?.stage || '', a.tracking?.stageDate || '', a.tracking?.banner || '', a.tracking?.reason || '',
       _rtDate(a.checkedAt, true), rtAgeDays(r),
     ].map(q).join(';');
   }));
