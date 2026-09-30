@@ -987,6 +987,79 @@ td { padding: 16px 24px; vertical-align: middle; }
 .search-card-label { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:var(--text3); font-weight:700; }
 .search-card-val { font-size:12px; color:var(--text2); font-family:var(--mono); word-break:break-all; }
 .search-empty { text-align:center; padding:40px 16px; color:var(--text3); font-size:14px; }
+
+/* ═══ İADELER ═══ */
+#returns-view{display:none;position:fixed;left:0;right:0;bottom:0;top:calc(70px + var(--safe-top));z-index:49;background:linear-gradient(135deg,#fdf2f8 0%,#f4f7fb 55%,#eef6ff 100%);overflow-y:auto;}
+.rt-wrap{max-width:1040px;margin:0 auto;padding:16px 16px calc(24px + var(--safe-bot));}
+.rt-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+.rt-actions .rt-meta{flex:1;min-width:160px;font-size:11px;color:var(--text3);text-align:right;}
+.rt-btn{border:1px solid var(--border);background:var(--bg1);color:var(--text2);font-family:var(--sans);font-size:12px;font-weight:700;padding:8px 12px;border-radius:10px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.rt-btn:hover{border-color:rgba(15,23,42,.2);transform:translateY(-1px);}
+.rt-btn:disabled{opacity:.55;cursor:wait;transform:none;}
+.rt-btn.primary{background:linear-gradient(135deg,#db2777,#f97316);color:#fff;border-color:transparent;box-shadow:0 4px 14px rgba(219,39,119,.25);}
+.rt-btn.dark{background:#0f172a;color:#fff;border-color:#0f172a;}
+.rt-btn.sm{font-size:11px;padding:5px 9px;border-radius:8px;}
+.rt-banner{background:#fff1f2;border:1px solid #fecdd3;color:#be123c;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:600;margin-bottom:12px;}
+.rt-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
+.rt-card{background:var(--bg1);border:1px solid var(--border);border-radius:14px;padding:12px 14px;box-shadow:0 2px 10px rgba(15,23,42,.04);cursor:pointer;transition:all .15s;position:relative;overflow:hidden;}
+.rt-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c,#94a3b8);}
+.rt-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(15,23,42,.08);}
+.rt-card.active{outline:2px solid var(--c,#94a3b8);outline-offset:-2px;}
+.rt-card-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);}
+.rt-card-val{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--c,var(--text));margin-top:4px;line-height:1.1;}
+.rt-card-sub{font-size:11px;color:var(--text3);margin-top:3px;font-family:var(--mono);}
+.rt-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+.rt-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.rt-chip{border:1px solid var(--border);background:var(--bg1);color:var(--text2);font-size:12px;font-weight:600;padding:6px 11px;border-radius:999px;cursor:pointer;white-space:nowrap;}
+.rt-chip.active{background:#0f172a;color:#fff;border-color:#0f172a;}
+.rt-chip .n{font-family:var(--mono);font-size:11px;opacity:.75;margin-left:4px;}
+.rt-search{flex:1;min-width:200px;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:var(--bg1);color:var(--text);}
+.rt-select{padding:8px 10px;border:1px solid var(--border);border-radius:10px;font-size:12px;background:var(--bg1);color:var(--text2);font-weight:600;}
+.rt-count{font-size:11px;color:var(--text3);margin:4px 2px 8px;}
+.rt-item{background:var(--bg1);border:1px solid var(--border);border-left:4px solid var(--c,#94a3b8);border-radius:14px;padding:12px 14px;margin-bottom:10px;box-shadow:0 2px 10px rgba(15,23,42,.04);}
+.rt-top{display:flex;gap:12px;align-items:flex-start;}
+.rt-img{width:64px;height:64px;border-radius:10px;object-fit:contain;background:#fff;border:1px solid var(--border);flex-shrink:0;}
+.rt-main{flex:1;min-width:0;}
+.rt-ids{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;}
+.rt-id{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text);cursor:pointer;}
+.rt-id small{font-family:var(--sans);font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-right:4px;}
+.rt-id.buyer{color:var(--seller-blue);}
+.rt-sub{font-size:11px;color:var(--text3);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 10px;}
+.rt-sub b{color:var(--text2);font-weight:600;}
+.rt-side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;max-width:44%;}
+.rt-verdict{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;padding:6px 10px;border-radius:10px;background:var(--cb,#f1f5f9);color:var(--c,#475569);white-space:nowrap;}
+.rt-pill{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:#f1f5f9;color:#475569;white-space:nowrap;}
+.rt-age{font-size:11px;font-weight:700;color:var(--text3);}
+.rt-age.bad{color:#e11d48;}
+.rt-amz{margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;}
+.rt-amz-title{font-size:13px;font-weight:700;color:var(--text);}
+.rt-amz-msg{font-size:11px;color:var(--text3);margin-top:2px;}
+.rt-money{text-align:right;font-family:var(--mono);font-size:12px;color:var(--text2);white-space:nowrap;}
+.rt-money b{font-size:15px;}
+.rt-tl{display:flex;gap:0;margin-top:10px;overflow-x:auto;padding-bottom:2px;}
+.rt-step{flex:1;min-width:92px;position:relative;padding-top:14px;text-align:center;}
+.rt-step::before{content:'';position:absolute;top:5px;left:0;right:0;height:2px;background:var(--bg4);}
+.rt-step:first-child::before{left:50%;}
+.rt-step:last-child::before{right:50%;}
+.rt-step::after{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid var(--bg4);box-sizing:border-box;}
+.rt-step.done::before{background:var(--sc,#10b981);}
+.rt-step.done::after{background:var(--sc,#10b981);border-color:var(--sc,#10b981);}
+.rt-step.warn::after{background:#fff;border-color:#e11d48;}
+.rt-step-l{font-size:10px;font-weight:700;color:var(--text2);}
+.rt-step-d{font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:1px;}
+.rt-foot{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;}
+.rt-foot .rt-checked{flex:1;text-align:right;font-size:10px;color:var(--text3);min-width:120px;}
+.rt-link{font-size:11px;font-weight:700;color:var(--seller-blue);text-decoration:none;padding:5px 9px;border:1px solid rgba(2,132,199,.25);border-radius:8px;background:rgba(2,132,199,.06);white-space:nowrap;}
+.rt-link:hover{background:rgba(2,132,199,.12);}
+.rt-empty{text-align:center;padding:40px 16px;color:var(--text3);font-size:14px;background:var(--bg1);border:1px dashed var(--border);border-radius:14px;}
+@media (max-width:640px){
+  .rt-top{flex-wrap:wrap;}
+  .rt-img{width:52px;height:52px;}
+  .rt-side{max-width:100%;width:100%;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:flex-start;}
+  .rt-card-val{font-size:20px;}
+  .rt-amz{grid-template-columns:1fr;}
+  .rt-money{text-align:left;}
+}
 </style>
 </head>
 <body>
@@ -1045,6 +1118,13 @@ td { padding: 16px 24px; vertical-align: middle; }
     </button>
     <button class="icon-btn" id="profit-tab-btn" onclick="toggleProfitPanel()" title="Kâr Raporu" style="position:relative;">
       💰
+    </button>
+    <button class="icon-btn" id="rt-back-btn" onclick="toggleReturnsPanel()" title="Geri Dön" style="display:none;background:rgba(219,39,119,0.12);border-color:rgba(219,39,119,0.3);color:#db2777;font-size:16px;font-weight:700;">
+      ←
+    </button>
+    <button class="icon-btn" id="rt-tab-btn" onclick="toggleReturnsPanel()" title="İadeler" style="position:relative;">
+      ↩️
+      <span id="rt-badge" style="display:none;position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e11d48;color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;"></span>
     </button>
     <button class="icon-btn" id="search-back-btn" onclick="toggleSearchPanel()" title="Geri Dön" style="display:none;background:rgba(2,132,199,0.12);border-color:rgba(2,132,199,0.3);color:var(--seller-blue);font-size:16px;font-weight:700;">
       ←
@@ -1132,6 +1212,41 @@ td { padding: 16px 24px; vertical-align: middle; }
   </div>
 </div>
 
+<!-- İADELER VIEW -->
+<div id="returns-view">
+  <div class="rt-wrap">
+    <div class="rt-actions">
+      <button class="rt-btn primary" onclick="scanReturns(false,this)">🔄 İadeleri Tara</button>
+      <button class="rt-btn" onclick="if(confirm('Para iadesi alınmamış TÜM iadeler .com\'da yeniden kontrol edilsin mi?\n(Tur başına en fazla 40 sipariş — kalanı sonraki turda.)'))scanReturns(true,this)">⚡ Zorla Kontrol</button>
+      <button class="rt-btn" onclick="loadReturns().then(renderReturnsPanel)">↻ Yenile</button>
+      <button class="rt-btn" onclick="exportReturnsCsv()">⬇ CSV</button>
+      <div class="rt-meta" id="rt-meta"></div>
+    </div>
+    <div id="rt-banner"></div>
+    <div class="rt-cards" id="rt-cards"></div>
+    <div class="rt-chips" id="rt-mkt-chips"></div>
+    <div class="rt-toolbar">
+      <input id="rt-search" class="rt-search" type="text" placeholder="🔎 Seller / Buyer Order ID, ASIN, takip no, RMA..." autocomplete="off" autocorrect="off" autocapitalize="off" oninput="_rtSearch=this.value;renderReturnsList()">
+      <select class="rt-select" id="rt-sf-filter" onchange="_rtSf=this.value;renderReturnsList()">
+        <option value="all">SF süreci: Tümü</option>
+        <option value="waiting">Müşteri gönderimi bekleniyor</option>
+        <option value="transit">Müşteri kargoda</option>
+        <option value="atwh">Depoya ulaştı</option>
+        <option value="sent">Depodan Amazon'a çıktı</option>
+      </select>
+      <select class="rt-select" onchange="_rtSort=this.value;renderReturnsList()">
+        <option value="priority">Sıralama: Öncelik</option>
+        <option value="new">En yeni</option>
+        <option value="old">En eski</option>
+        <option value="amount">Tutar (yüksek)</option>
+      </select>
+    </div>
+    <div class="rt-chips" id="rt-status-chips"></div>
+    <div class="rt-count" id="rt-count"></div>
+    <div id="rt-list"></div>
+  </div>
+</div>
+
 <!-- SİPARİŞ ARAMA VIEW -->
 <div id="search-view">
   <div class="search-inner">
@@ -1187,6 +1302,7 @@ td { padding: 16px 24px; vertical-align: middle; }
         <button class="cmd-btn cmd-btn-amazon" onclick="triggerCmdAll('amazontara',this)">🛒 Amazon Tara</button>
         <button class="cmd-btn cmd-btn-cargo" onclick="triggerCmdAll('kargosorgula',this)">📦 Kargo Sorgula</button>
         <button class="cmd-btn cmd-btn-teslim" onclick="triggerCmdAll('teslim',this)">✅ Teslim Sync</button>
+        <button class="cmd-btn cmd-btn-amazon" onclick="triggerCmdAll('iadetara',this)">↩️ İade Tara</button>
         <button class="cmd-btn cmd-btn-depo-refresh" onclick="triggerCmdAll('depo_yenile',this)">🔑 Depo Tokenları Yenile</button>
         <button class="cmd-btn cmd-btn-depo-refresh" onclick="if(confirm('Yanlış mağazadaki (bug döneminden takılı) siparişleri doğru mağazaya taşı?\n\nGüvenlidir, tekrar çalıştırılabilir. Önce sunucunun yeni sürümü deploy olmuş olmalı.'))triggerCmdAll('temizle_mkt',this)">🧹 Mağaza Temizle</button>
         <button class="cmd-btn cmd-btn-depo-refresh" onclick="if(confirm('Supabase\'deki tüm siparişlerin SF kargo ücretleri (wareHouseCost), sipariş tarihinin kuruyla yeniden hesaplanıp SF\'ye yazılsın mı?\n\nGüvenlidir, tekrar çalıştırılabilir. Sonuç Telegram\'a gelir.'))triggerCmdAll('kargo_kur',this)">💱 Kargo Kur Düzelt</button>
@@ -2797,6 +2913,7 @@ function toggleMsgPanel() {
   _msgPanelOpen = !_msgPanelOpen;
   if (_msgPanelOpen && _profitPanelOpen) toggleProfitPanel();
   if (_msgPanelOpen && _searchPanelOpen) toggleSearchPanel();
+  if (_msgPanelOpen && _rtPanelOpen) toggleReturnsPanel();
   const view    = document.getElementById('msg-view');
   const main    = document.getElementById('main');
   const btn     = document.getElementById('msg-tab-btn');
@@ -3374,6 +3491,7 @@ async function ensureFxHistory(fromTs, toTs) {
 function toggleProfitPanel() {
   _profitPanelOpen = !_profitPanelOpen;
   if (_profitPanelOpen && _searchPanelOpen) toggleSearchPanel();
+  if (_profitPanelOpen && _rtPanelOpen) toggleReturnsPanel();
   const view     = document.getElementById('profit-view');
   const main     = document.getElementById('main');
   const btn      = document.getElementById('profit-tab-btn');
@@ -3527,6 +3645,7 @@ function toggleSearchPanel() {
   _searchPanelOpen = !_searchPanelOpen;
   if (_searchPanelOpen && _profitPanelOpen) toggleProfitPanel();
   if (_searchPanelOpen && _msgPanelOpen) toggleMsgPanel();
+  if (_searchPanelOpen && _rtPanelOpen) toggleReturnsPanel();
   const view    = document.getElementById('search-view');
   const main    = document.getElementById('main');
   const btn     = document.getElementById('search-tab-btn');
@@ -3695,6 +3814,375 @@ async function renderWhHealth() {
   } catch (e) { setH(''); }
 }
 
+// ─── İADELER — SF iadeleri + .com iade/para iadesi kontrolü ──────────────────
+let _rtPanelOpen = false;
+let _rtData      = {};   // mktId → { returnId → kayıt, _meta }
+let _rtStores    = {};   // mktId → mağaza adı
+let _rtMkt       = null;
+let _rtStatus    = 'all';
+let _rtSf        = 'all';
+let _rtSort      = 'priority';
+let _rtSearch    = '';
+const RT_ALERT_DAYS = 2;
+
+const RT_VERDICT = {
+  NO_RETURN:      { key: 'NO_RETURN',      label: '.com İade Açılmamış',   icon: '⚠️', c: '#e11d48', cb: '#fff1f2', rank: 0 },
+  ERROR:          { key: 'ERROR',          label: 'Kontrol Hatası',         icon: '❌', c: '#b45309', cb: '#fffbeb', rank: 1 },
+  UNCHECKED:      { key: 'UNCHECKED',      label: 'Henüz Kontrol Edilmedi', icon: '❔', c: '#64748b', cb: '#f1f5f9', rank: 2 },
+  RETURN_STARTED: { key: 'RETURN_STARTED', label: 'İade Açık · Para Bekleniyor', icon: '⏳', c: '#d97706', cb: '#fffbeb', rank: 3 },
+  PARTIAL:        { key: 'PARTIAL',        label: 'Kısmi Para İadesi',      icon: '🟠', c: '#ea580c', cb: '#fff7ed', rank: 4 },
+  CANCELLED:      { key: 'CANCELLED',      label: '.com Sipariş İptal',     icon: '🚫', c: '#475569', cb: '#f1f5f9', rank: 5 },
+  REFUNDED:       { key: 'REFUNDED',       label: 'Para İadesi Alındı',     icon: '✅', c: '#059669', cb: '#ecfdf5', rank: 6 },
+};
+
+function _rtEsc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function _rtTs(v)  { if (!v) return 0; const t = typeof v === 'number' ? v : new Date(v).getTime(); return isNaN(t) ? 0 : t; }
+function _rtDate(v, withTime) {
+  const t = _rtTs(v); if (!t) return '';
+  const d = new Date(t);
+  const s = d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
+  return withTime ? `${s} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` : s;
+}
+function _rtAgo(v) {
+  const t = _rtTs(v); if (!t) return '—';
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return 'az önce';
+  if (m < 60) return `${m} dk önce`;
+  if (m < 1440) return `${Math.round(m / 60)} sa önce`;
+  return `${Math.round(m / 1440)} gün önce`;
+}
+function _rtMoney(v) { return (typeof v === 'number' && !isNaN(v)) ? '$' + v.toFixed(2) : '—'; }
+
+function rtVerdict(r) {
+  const a = r.amazon || {};
+  if (a.verdict === 'REFUNDED') return a.partial ? RT_VERDICT.PARTIAL : RT_VERDICT.REFUNDED;
+  if (a.verdict && RT_VERDICT[a.verdict]) return RT_VERDICT[a.verdict];
+  if (a.error) return RT_VERDICT.ERROR;
+  return RT_VERDICT.UNCHECKED;
+}
+
+// SF iade süreci (müşteri → depo → Amazon)
+function rtSfStage(r) {
+  if (r.warehouseSentDate)     return { key: 'sent',    label: 'Depodan Amazon\'a çıktı', c: '#059669' };
+  if (r.warehouseDeliveryDate) return { key: 'atwh',    label: 'Depoya ulaştı',           c: '#0284c7' };
+  if (r.trackingNumber)        return { key: 'transit', label: 'Müşteri kargoda',         c: '#7c3aed' };
+  return { key: 'waiting', label: 'Müşteri gönderimi bekleniyor', c: '#64748b' };
+}
+
+function rtAgeDays(r) { const t = _rtTs(r.createDate); return t ? Math.floor((Date.now() - t) / 86400000) : null; }
+
+function rtTrackUrl(r) {
+  if (r.trackingUrl) return r.trackingUrl;
+  const n = encodeURIComponent(r.trackingNumber || '');
+  if (!n) return null;
+  const c = String(r.carrier || '').toUpperCase();
+  if (c.includes('DHL'))    return `https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode=${n}`;
+  if (c.includes('DPD'))    return `https://tracking.dpd.de/status/de_DE/parcel/${n}`;
+  if (c.includes('HERMES')) return `https://www.myhermes.de/empfangen/sendungsverfolgung/sendungsinformation#${n}`;
+  if (c.includes('GLS'))    return `https://gls-group.com/DE/de/paketverfolgung?match=${n}`;
+  if (c.includes('UPS'))    return `https://www.ups.com/track?tracknum=${n}`;
+  if (c.includes('ROYAL'))  return `https://www.royalmail.com/track-your-item#/tracking-results/${n}`;
+  return `https://www.google.com/search?q=${n}`;
+}
+
+async function loadReturns() {
+  const mkts = (CFG.mkts && CFG.mkts.length) ? CFG.mkts : [];
+  const next = {};
+  await Promise.all(mkts.map(async mktId => {
+    try {
+      const v = await sbGet(`RETURNS_${mktId}`);
+      next[mktId] = (v && typeof v === 'object') ? v : {};
+    } catch (e) { next[mktId] = _rtData[mktId] || {}; }
+    if (!_rtStores[mktId]) { try { _rtStores[mktId] = await fetchStoreName(mktId); } catch (e) { _rtStores[mktId] = mktId; } }
+  }));
+  _rtData = next;
+  refreshReturnsBadge();
+}
+
+function rtAllRecords() {
+  const out = [];
+  for (const [mktId, recs] of Object.entries(_rtData)) {
+    for (const [id, r] of Object.entries(recs || {})) {
+      if (id === '_meta' || !r || !r.sid) continue;
+      out.push({ ...r, id: r.id || id, mktId });
+    }
+  }
+  return out;
+}
+
+function refreshReturnsBadge() {
+  const badge = document.getElementById('rt-badge');
+  if (!badge) return;
+  const n = rtAllRecords().filter(r => rtVerdict(r).key === 'NO_RETURN').length;
+  badge.textContent = n > 99 ? '99+' : String(n);
+  badge.style.display = n > 0 ? 'block' : 'none';
+}
+
+function toggleReturnsPanel() {
+  _rtPanelOpen = !_rtPanelOpen;
+  if (_rtPanelOpen && typeof _msgPanelOpen !== 'undefined' && _msgPanelOpen) toggleMsgPanel();
+  if (_rtPanelOpen && typeof _profitPanelOpen !== 'undefined' && _profitPanelOpen) toggleProfitPanel();
+  if (_rtPanelOpen && typeof _searchPanelOpen !== 'undefined' && _searchPanelOpen) toggleSearchPanel();
+  const view    = document.getElementById('returns-view');
+  const main    = document.getElementById('main');
+  const btn     = document.getElementById('rt-tab-btn');
+  const backBtn = document.getElementById('rt-back-btn');
+  const logoText= document.querySelector('.logo-text');
+  view.style.display    = _rtPanelOpen ? 'block' : 'none';
+  main.style.display    = _rtPanelOpen ? 'none'  : '';
+  btn.style.display     = _rtPanelOpen ? 'none'  : '';
+  backBtn.style.display = _rtPanelOpen ? 'flex'  : 'none';
+  if (logoText) logoText.innerHTML = _rtPanelOpen ? '<span>İadeler</span>' : 'Seller<span>Flash</span>';
+  if (_rtPanelOpen) {
+    renderReturnsPanel();
+    loadReturns().then(renderReturnsPanel).catch(() => {});
+  }
+}
+
+function renderReturnsPanel() {
+  const all  = rtAllRecords();
+  const scoped = _rtMkt ? all.filter(r => r.mktId === _rtMkt) : all;
+
+  // Üst bilgi: son tarama zamanları + login uyarısı
+  const metas = Object.entries(_rtData).map(([m, d]) => ({ mktId: m, ...(d && d._meta) }));
+  const lastScan = Math.max(0, ...metas.map(m => m.lastScanAt || 0));
+  document.getElementById('rt-meta').innerHTML = lastScan
+    ? `Son tarama: <b>${_rtAgo(lastScan)}</b> · ${_rtDate(lastScan, true)}`
+    : 'Henüz tarama yapılmadı — “İadeleri Tara” ile başlat.';
+  const warns = [];
+  if (metas.some(m => m.loginRequired)) warns.push('🔐 Sunucuda Amazon oturumu düşmüş — .com kontrolü yapılamıyor. Telegram\'dan login yenile.');
+  for (const m of metas) if (m.sfError && (m.sfErrorAt || 0) > (m.sfSyncedAt || 0)) warns.push(`⚠️ ${_rtEsc(_rtStores[m.mktId] || m.mktId)}: SF iade listesi alınamadı (${_rtEsc(m.sfError)})`);
+  document.getElementById('rt-banner').innerHTML = warns.map(w => `<div class="rt-banner">${w}</div>`).join('');
+
+  // Özet kartları
+  const by = k => scoped.filter(r => rtVerdict(r).key === k);
+  const sum = (arr, f) => arr.reduce((s, r) => s + (Number(f(r)) || 0), 0);
+  const noRet = by('NO_RETURN'), started = by('RETURN_STARTED'), refunded = [...by('REFUNDED'), ...by('PARTIAL')];
+  const unchecked = [...by('UNCHECKED'), ...by('ERROR')];
+  const pendingAmt = sum([...noRet, ...started], r => r.amazon?.grandTotal);
+  const unpaid = scoped.filter(r => !r.isPaid);
+  const overdue = noRet.filter(r => (rtAgeDays(r) ?? 0) >= RT_ALERT_DAYS).length;
+  const card = (label, val, sub, c, filter) => `
+    <div class="rt-card${_rtStatus === filter ? ' active' : ''}" style="--c:${c}" onclick="_rtStatus='${filter}';renderReturnsPanel()">
+      <div class="rt-card-label">${label}</div>
+      <div class="rt-card-val">${val}</div>
+      <div class="rt-card-sub">${sub}</div>
+    </div>`;
+  document.getElementById('rt-cards').innerHTML =
+    card('Toplam İade', scoped.length, `${unchecked.length} kontrol bekliyor`, '#0f172a', 'all') +
+    card('⚠️ .com İade Açılmamış', noRet.length, overdue ? `${overdue} tanesi ${RT_ALERT_DAYS}+ gündür` : 'gecikme yok', '#e11d48', 'NO_RETURN') +
+    card('⏳ Para Bekleniyor', started.length, `${_rtMoney(sum(started, r => r.amazon?.grandTotal))} bekleyen`, '#d97706', 'RETURN_STARTED') +
+    card('✅ Para Alındı', refunded.length, `${_rtMoney(sum(refunded, r => r.amazon?.refundTotal))} iade`, '#059669', 'REFUNDED') +
+    card('💵 Açık Tutar', _rtMoney(pendingAmt), 'alınmamış .com ödemesi', '#7c3aed', 'OPEN') +
+    card('📦 SF İade Ücreti', _rtMoney(sum(scoped, r => r.totalCharge)), `${_rtMoney(sum(unpaid, r => r.totalCharge))} ödenmemiş`, '#0284c7', 'UNPAID');
+
+  // Mağaza çipleri
+  const mkts = Object.keys(_rtData);
+  const cnt = m => all.filter(r => r.mktId === m).length;
+  document.getElementById('rt-mkt-chips').innerHTML =
+    `<button class="rt-chip${!_rtMkt ? ' active' : ''}" onclick="_rtMkt=null;renderReturnsPanel()">🌍 Tüm Mağazalar<span class="n">${all.length}</span></button>` +
+    mkts.map(m => `<button class="rt-chip${_rtMkt === m ? ' active' : ''}" onclick="_rtMkt='${m}';renderReturnsPanel()">${_rtEsc(_rtStores[m] || m)}<span class="n">${cnt(m)}</span></button>`).join('');
+
+  // Durum çipleri
+  const st = [
+    ['all', 'Tümü', scoped.length],
+    ['NO_RETURN', '⚠️ Açılmamış', noRet.length],
+    ['RETURN_STARTED', '⏳ Para Bekleniyor', started.length],
+    ['REFUNDED', '✅ Para Alındı', refunded.length],
+    ['PARTIAL', '🟠 Kısmi', by('PARTIAL').length],
+    ['UNCHECKED', '❔ Kontrol Edilmedi', by('UNCHECKED').length],
+    ['ERROR', '❌ Hata', by('ERROR').length],
+    ['CANCELLED', '🚫 İptal', by('CANCELLED').length],
+  ];
+  document.getElementById('rt-status-chips').innerHTML = st
+    .filter(([k, , n]) => k === 'all' || n > 0 || _rtStatus === k)
+    .map(([k, l, n]) => `<button class="rt-chip${_rtStatus === k ? ' active' : ''}" onclick="_rtStatus='${k}';renderReturnsPanel()">${l}<span class="n">${n}</span></button>`).join('');
+
+  renderReturnsList();
+}
+
+function rtFiltered() {
+  let list = rtAllRecords();
+  if (_rtMkt) list = list.filter(r => r.mktId === _rtMkt);
+  if (_rtStatus === 'OPEN') list = list.filter(r => ['NO_RETURN', 'RETURN_STARTED'].includes(rtVerdict(r).key));
+  else if (_rtStatus === 'UNPAID') list = list.filter(r => !r.isPaid);
+  else if (_rtStatus === 'REFUNDED') list = list.filter(r => ['REFUNDED', 'PARTIAL'].includes(rtVerdict(r).key));
+  else if (_rtStatus !== 'all') list = list.filter(r => rtVerdict(r).key === _rtStatus);
+  if (_rtSf !== 'all') list = list.filter(r => rtSfStage(r).key === _rtSf);
+  const q = _rtSearch.trim().toLowerCase();
+  if (q) list = list.filter(r => [r.sid, r.buyerOrderId, r.asin, r.trackingNumber, r.rmaNumber, r.amazon?.rmaId, r.carrier, _rtStores[r.mktId]]
+    .some(v => v && String(v).toLowerCase().includes(q)));
+  const created = r => _rtTs(r.createDate);
+  if (_rtSort === 'new') list.sort((a, b) => created(b) - created(a));
+  else if (_rtSort === 'old') list.sort((a, b) => created(a) - created(b));
+  else if (_rtSort === 'amount') list.sort((a, b) => (b.amazon?.grandTotal || 0) - (a.amazon?.grandTotal || 0));
+  else list.sort((a, b) => rtVerdict(a).rank - rtVerdict(b).rank || created(a) - created(b));
+  return list;
+}
+
+function renderReturnsList() {
+  const list = rtFiltered();
+  const total = rtAllRecords().length;
+  document.getElementById('rt-count').textContent = total ? `${list.length} / ${total} iade gösteriliyor` : '';
+  const el = document.getElementById('rt-list');
+  if (!list.length) {
+    el.innerHTML = `<div class="rt-empty">${total ? 'Bu filtreye uygun iade yok.' : '📭 Henüz iade verisi yok.<br><span style="font-size:12px">Sunucu her saat SF iadelerini çeker — hemen başlatmak için “İadeleri Tara”.</span>'}</div>`;
+    return;
+  }
+  el.innerHTML = list.map(rtItemHtml).join('');
+}
+
+function rtItemHtml(r) {
+  const v   = rtVerdict(r);
+  const a   = r.amazon || {};
+  const sf  = rtSfStage(r);
+  const age = rtAgeDays(r);
+  const late = v.key === 'NO_RETURN' && age !== null && age >= RT_ALERT_DAYS;
+  const store = _rtStores[r.mktId] || r.mktId;
+  const amzUrl = r.buyerOrderId ? `https://www.amazon.com/gp/your-account/order-details/?orderID=${encodeURIComponent(r.buyerOrderId)}` : null;
+  const trk = rtTrackUrl(r);
+  const k = `${r.mktId}-${r.id}`;
+
+  const amzTitle = v.key === 'NO_RETURN'
+    ? 'Bu .com siparişinde iade talebi bulunamadı'
+    : v.key === 'UNCHECKED' ? 'Sunucu henüz .com sayfasını kontrol etmedi'
+    : v.key === 'ERROR' ? (a.error || 'Kontrol hatası')
+    : (a.statusTitle || v.label);
+  const amzMsg = v.key === 'NO_RETURN' ? '.com\'dan iade talebi açılmalı — ürün depodan Amazon\'a dönecek.'
+    : (a.statusMessage || '');
+  const money = (a.grandTotal != null || a.refundTotal != null)
+    ? `<div class="rt-money">${a.refundTotal != null ? `İade <b style="color:#059669">${_rtMoney(a.refundTotal)}</b>` : `Tutar <b>${_rtMoney(a.grandTotal)}</b>`}${a.refundTotal != null && a.grandTotal != null ? `<div>/ ${_rtMoney(a.grandTotal)} sipariş</div>` : ''}</div>` : '<div></div>';
+
+  const steps = [
+    ['SF iade açıldı', r.createDate, true],
+    ['Müşteri kargoda', null, !!r.trackingNumber],
+    ['Depoya ulaştı', r.warehouseDeliveryDate, !!r.warehouseDeliveryDate],
+    ['Amazon\'a çıktı', r.warehouseSentDate, !!r.warehouseSentDate],
+    ['.com iade açık', r.returnStartedAt, !!r.returnStartedAt || ['RETURN_STARTED', 'REFUNDED', 'PARTIAL'].includes(v.key)],
+    ['Para iadesi', r.refundedAt, ['REFUNDED', 'PARTIAL'].includes(v.key)],
+  ];
+  const tl = steps.map(([l, d, done], i) => {
+    const warn = !done && i === 4 && v.key === 'NO_RETURN';
+    return `<div class="rt-step${done ? ' done' : ''}${warn ? ' warn' : ''}" style="--sc:${i >= 4 ? '#059669' : '#0284c7'}">
+      <div class="rt-step-l">${l}</div><div class="rt-step-d">${done && d ? _rtDate(d) : (warn ? '<span style="color:#e11d48">yok</span>' : '·')}</div></div>`;
+  }).join('');
+
+  return `
+  <div class="rt-item" id="rt-item-${k}" style="--c:${v.c}">
+    <div class="rt-top">
+      ${r.imageUrl ? `<img class="rt-img" src="${_rtEsc(r.imageUrl)}" loading="lazy" onerror="this.style.visibility='hidden'">` : '<div class="rt-img"></div>'}
+      <div class="rt-main">
+        <div class="rt-ids">
+          <span class="rt-id" title="Kopyala" onclick="rtCopy('${_rtEsc(r.sid)}')"><small>Seller</small>${_rtEsc(r.sid)}</span>
+          ${r.buyerOrderId ? `<span class="rt-id buyer" title="Kopyala" onclick="rtCopy('${_rtEsc(r.buyerOrderId)}')"><small>Buyer</small>${_rtEsc(r.buyerOrderId)}</span>` : `<span class="rt-id" style="color:var(--text3)"><small>Buyer</small>—</span>`}
+        </div>
+        <div class="rt-sub">
+          <span>🛒 <b>${_rtEsc(store)}</b></span>
+          ${r.asin ? `<span>ASIN <b>${_rtEsc(r.asin)}</b>${(r.products || []).length > 1 ? ` +${r.products.length - 1}` : ''}</span>` : ''}
+          ${r.returnRouteText ? `<span>🔁 ${_rtEsc(r.returnRouteText)}</span>` : ''}
+        </div>
+        <div class="rt-sub">
+          ${r.carrier || r.trackingNumber ? `<span>🚚 <b>${_rtEsc(r.carrier || '?')}</b> ${r.trackingNumber ? (trk ? `<a href="${_rtEsc(trk)}" target="_blank" rel="noopener" style="color:var(--seller-blue);font-family:var(--mono)">${_rtEsc(r.trackingNumber)}</a>` : _rtEsc(r.trackingNumber)) : ''}</span>` : '<span>🚚 Etiket henüz yok</span>'}
+          ${r.rmaNumber ? `<span>SF RMA <b style="font-family:var(--mono)">${_rtEsc(r.rmaNumber)}</b></span>` : ''}
+          <span>SF ücret <b>${_rtMoney(r.totalCharge)}</b> ${r.isPaid ? '<span style="color:#059669;font-weight:700">· ödendi</span>' : '<span style="color:#d97706;font-weight:700">· ödenmedi</span>'}</span>
+        </div>
+      </div>
+      <div class="rt-side">
+        <span class="rt-verdict" style="--c:${v.c};--cb:${v.cb}">${v.icon} ${v.label}</span>
+        <span class="rt-pill" style="color:${sf.c};background:${sf.c}14">SF: ${sf.label}</span>
+        <span class="rt-age${late ? ' bad' : ''}">${age !== null ? (late ? `⏰ ${age} gündür .com iadesi yok` : `${age} gün önce açıldı`) : ''}</span>
+      </div>
+    </div>
+    <div class="rt-amz">
+      <div>
+        <div class="rt-amz-title" style="color:${v.c}">${_rtEsc(amzTitle)}</div>
+        ${amzMsg ? `<div class="rt-amz-msg">${_rtEsc(amzMsg)}</div>` : ''}
+        ${a.rmaId ? `<div class="rt-amz-msg">.com RMA: <b style="font-family:var(--mono)">${_rtEsc(a.rmaId)}</b></div>` : ''}
+      </div>
+      ${money}
+    </div>
+    <div class="rt-tl">${tl}</div>
+    <div class="rt-foot">
+      ${amzUrl ? `<a class="rt-link" href="${amzUrl}" target="_blank" rel="noopener">🛒 .com Siparişi</a>` : ''}
+      ${a.statusUrl ? `<a class="rt-link" href="${_rtEsc(a.statusUrl)}" target="_blank" rel="noopener">🔎 İade/Refund Durumu</a>` : ''}
+      ${a.labelUrl ? `<a class="rt-link" href="${_rtEsc(a.labelUrl)}" target="_blank" rel="noopener">🏷️ İade Etiketi</a>` : ''}
+      <a class="rt-link" href="https://panel.sellerflash.com/returns" target="_blank" rel="noopener">SF İadeler</a>
+      <button class="rt-btn sm dark" onclick="checkReturnNow('${r.mktId}','${_rtEsc(String(r.id))}',this)">🔄 Şimdi Kontrol Et</button>
+      <span class="rt-checked">${a.checkedAt ? `.com kontrol: ${_rtAgo(a.checkedAt)}` : '.com kontrol: —'}</span>
+    </div>
+  </div>`;
+}
+
+function rtCopy(t) {
+  try { navigator.clipboard.writeText(t); showToast(`Kopyalandı: ${t}`); } catch (e) {}
+}
+
+async function scanReturns(force, btn) {
+  const serverUrl = getServerUrl();
+  if (!serverUrl || !CFG.apiKey) { showToast('Ayarlar\'dan Sunucu URL ve API Key gir', 'error'); return; }
+  if (btn) { btn.disabled = true; }
+  try {
+    const res = await fetch(`${serverUrl}/returns/scan`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mktId: _rtMkt || null, force: !!force }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.ok) throw new Error(d.error || `HTTP ${res.status}`);
+    showToast(`${d.msg || 'İade taraması başladı'} — sonuçlar geldikçe güncellenir`);
+    setTimeout(() => { if (_rtPanelOpen) loadReturns().then(renderReturnsPanel); }, 25000);
+  } catch (e) {
+    showToast('İade taraması başlatılamadı: ' + e.message, 'error');
+  } finally {
+    if (btn) setTimeout(() => { btn.disabled = false; }, 3000);
+  }
+}
+
+async function checkReturnNow(mktId, returnId, btn) {
+  const serverUrl = getServerUrl();
+  if (!serverUrl || !CFG.apiKey) { showToast('Ayarlar\'dan Sunucu URL ve API Key gir', 'error'); return; }
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Kontrol ediliyor…'; }
+  try {
+    const res = await fetch(`${serverUrl}/returns/check`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mktId, returnId }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (d.record && _rtData[mktId]) _rtData[mktId][returnId] = d.record;
+    if (!d.ok) throw new Error(d.error || `HTTP ${res.status}`);
+    const v = rtVerdict(d.record || {});
+    showToast(`${v.icon} ${v.label}`);
+  } catch (e) {
+    showToast('Kontrol başarısız: ' + e.message, 'error');
+  } finally {
+    refreshReturnsBadge();
+    if (_rtPanelOpen) renderReturnsPanel();
+    else if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+  }
+}
+
+function exportReturnsCsv() {
+  const rows = rtFiltered();
+  const head = ['Mağaza','Seller Order','Buyer Order','ASIN','SF İade Tarihi','SF Süreç','Kargo','Takip No','SF RMA','SF Ücret','SF Ödendi','Depoya Ulaştı','Depodan Çıktı','.com Durum','.com Başlık','.com RMA','Sipariş Tutarı','İade Tutarı','Kısmi','.com Kontrol','Gün'];
+  const q = v => { const s = String(v ?? ''); return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const lines = [head.join(';')].concat(rows.map(r => {
+    const a = r.amazon || {};
+    return [
+      _rtStores[r.mktId] || r.mktId, r.sid, r.buyerOrderId, r.asin, _rtDate(r.createDate, true), rtSfStage(r).label,
+      r.carrier, r.trackingNumber, r.rmaNumber, r.totalCharge, r.isPaid ? 'Evet' : 'Hayır',
+      _rtDate(r.warehouseDeliveryDate, true), _rtDate(r.warehouseSentDate, true),
+      rtVerdict(r).label, a.statusTitle, a.rmaId, a.grandTotal, a.refundTotal, a.partial ? 'Evet' : '',
+      _rtDate(a.checkedAt, true), rtAgeDays(r),
+    ].map(q).join(';');
+  }));
+  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `iadeler-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+}
+
 // ─── Supabase Realtime — anlık güncelleme (polling fallback korunur) ──────────
 let _sbRealtime = null;
 let _rtDebounce = null;
@@ -3705,7 +4193,7 @@ function setupRealtime() {
     _sbRealtime = client.channel('sf_store_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_store' }, () => {
         clearTimeout(_rtDebounce);
-        _rtDebounce = setTimeout(() => { refreshAll().catch(() => {}); }, 400);
+        _rtDebounce = setTimeout(() => { refreshAll().catch(() => {}); if (_rtPanelOpen) loadReturns().then(renderReturnsPanel).catch(() => {}); }, 400);
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
@@ -3727,6 +4215,8 @@ async function init() {
   setInterval(() => renderWhHealth().catch(() => {}), 30000);
   setupRealtime();
   loadMsgQueues().catch(() => {});
+  loadReturns().catch(() => {});
+  setInterval(() => loadReturns().then(() => { if (_rtPanelOpen) renderReturnsPanel(); }).catch(() => {}), 120000);
 }
 
 if (loadConfig() && CFG.url && CFG.key) {
