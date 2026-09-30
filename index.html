@@ -1051,6 +1051,16 @@ td { padding: 16px 24px; vertical-align: middle; }
 .rt-foot .rt-checked{flex:1;text-align:right;font-size:10px;color:var(--text3);min-width:120px;}
 .rt-link{font-size:11px;font-weight:700;color:var(--seller-blue);text-decoration:none;padding:5px 9px;border:1px solid rgba(2,132,199,.25);border-radius:8px;background:rgba(2,132,199,.06);white-space:nowrap;}
 .rt-link:hover{background:rgba(2,132,199,.12);}
+.rt-cb{width:18px;height:18px;margin-top:4px;accent-color:#db2777;cursor:pointer;flex-shrink:0;}
+.rt-item.sel{box-shadow:0 0 0 2px #db2777,0 4px 14px rgba(219,39,119,.12);}
+.rt-item.dismissed{opacity:.72;border-left-color:#94a3b8;}
+.rt-btn.danger{color:#e11d48;border-color:rgba(225,29,72,.3);background:#fff1f2;}
+.rt-btn.danger:hover{background:#ffe4e6;}
+#rt-selbar{position:sticky;top:0;z-index:5;margin-bottom:8px;}
+.rt-selbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#0f172a;color:#fff;border-radius:12px;padding:8px 10px;box-shadow:0 6px 20px rgba(15,23,42,.25);font-size:12px;font-weight:700;}
+.rt-selbar .sp{flex:1;}
+.rt-selbar .rt-btn{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.2);}
+.rt-selbar .rt-btn.danger{background:#e11d48;border-color:#e11d48;color:#fff;}
 .rt-empty{text-align:center;padding:40px 16px;color:var(--text3);font-size:14px;background:var(--bg1);border:1px dashed var(--border);border-radius:14px;}
 @media (max-width:640px){
   .rt-top{flex-wrap:wrap;}
@@ -1220,6 +1230,7 @@ td { padding: 16px 24px; vertical-align: middle; }
       <button class="rt-btn" onclick="if(confirm('Para iadesi alınmamış TÜM iadeler .com\'da yeniden kontrol edilsin mi?\n(Tur başına en fazla 40 sipariş — kalanı sonraki turda.)'))scanReturns(true,this)">⚡ Zorla Kontrol</button>
       <button class="rt-btn" onclick="loadReturns().then(renderReturnsPanel)">↻ Yenile</button>
       <button class="rt-btn" onclick="exportReturnsCsv()">⬇ CSV</button>
+      <button class="rt-btn" onclick="dismissOldReturns()">🧹 Eskileri Sil</button>
       <div class="rt-meta" id="rt-meta"></div>
     </div>
     <div id="rt-banner"></div>
@@ -1243,6 +1254,7 @@ td { padding: 16px 24px; vertical-align: middle; }
     </div>
     <div class="rt-chips" id="rt-status-chips"></div>
     <div class="rt-count" id="rt-count"></div>
+    <div id="rt-selbar"></div>
     <div id="rt-list"></div>
   </div>
 </div>
@@ -3899,11 +3911,13 @@ async function loadReturns() {
   refreshReturnsBadge();
 }
 
-function rtAllRecords() {
+// Varsayılan: panelden silinmiş (dismissed) kayıtlar hariç. dismissed=true → yalnızca silinenler.
+function rtAllRecords(dismissed = false) {
   const out = [];
   for (const [mktId, recs] of Object.entries(_rtData)) {
     for (const [id, r] of Object.entries(recs || {})) {
       if (id === '_meta' || !r || !r.sid) continue;
+      if (!!r.dismissed !== dismissed) continue;
       out.push({ ...r, id: r.id || id, mktId });
     }
   }
@@ -3993,6 +4007,7 @@ function renderReturnsPanel() {
     ['UNCHECKED', '❔ Kontrol Edilmedi', by('UNCHECKED').length],
     ['ERROR', '❌ Hata', by('ERROR').length],
     ['CANCELLED', '🚫 İptal', by('CANCELLED').length],
+    ['DISMISSED', '🗑 Silinenler', rtAllRecords(true).filter(r => !_rtMkt || r.mktId === _rtMkt).length],
   ];
   document.getElementById('rt-status-chips').innerHTML = st
     .filter(([k, , n]) => k === 'all' || n > 0 || _rtStatus === k)
@@ -4002,9 +4017,10 @@ function renderReturnsPanel() {
 }
 
 function rtFiltered() {
-  let list = rtAllRecords();
+  let list = rtAllRecords(_rtStatus === 'DISMISSED');
   if (_rtMkt) list = list.filter(r => r.mktId === _rtMkt);
-  if (_rtStatus === 'OPEN') list = list.filter(r => ['NO_RETURN', 'RETURN_STARTED'].includes(rtVerdict(r).key));
+  if (_rtStatus === 'DISMISSED') { /* silinenler görünümü */ }
+  else if (_rtStatus === 'OPEN') list = list.filter(r => ['NO_RETURN', 'RETURN_STARTED'].includes(rtVerdict(r).key));
   else if (_rtStatus === 'UNPAID') list = list.filter(r => !r.isPaid);
   else if (_rtStatus === 'REFUNDED') list = list.filter(r => ['REFUNDED', 'PARTIAL'].includes(rtVerdict(r).key));
   else if (_rtStatus !== 'all') list = list.filter(r => rtVerdict(r).key === _rtStatus);
@@ -4022,8 +4038,12 @@ function rtFiltered() {
 
 function renderReturnsList() {
   const list = rtFiltered();
-  const total = rtAllRecords().length;
-  document.getElementById('rt-count').textContent = total ? `${list.length} / ${total} iade gösteriliyor` : '';
+  const total = rtAllRecords(_rtStatus === 'DISMISSED').length;
+  document.getElementById('rt-count').textContent = total ? `${list.length} / ${total} ${_rtStatus === 'DISMISSED' ? 'silinmiş ' : ''}iade gösteriliyor` : '';
+  // Görünmeyenleri seçimden düşür
+  const visible = new Set(list.map(rtSelKey));
+  for (const k of [..._rtSel]) if (!visible.has(k)) _rtSel.delete(k);
+  renderReturnsSelBar(list);
   const el = document.getElementById('rt-list');
   if (!list.length) {
     el.innerHTML = `<div class="rt-empty">${total ? 'Bu filtreye uygun iade yok.' : '📭 Henüz iade verisi yok.<br><span style="font-size:12px">Sunucu her saat SF iadelerini çeker — hemen başlatmak için “İadeleri Tara”.</span>'}</div>`;
@@ -4068,8 +4088,9 @@ function rtItemHtml(r) {
   }).join('');
 
   return `
-  <div class="rt-item" id="rt-item-${k}" style="--c:${v.c}">
+  <div class="rt-item${_rtSel.has(rtSelKey(r)) ? ' sel' : ''}${r.dismissed ? ' dismissed' : ''}" id="rt-item-${k}" style="--c:${v.c}">
     <div class="rt-top">
+      <input type="checkbox" class="rt-cb" title="Seç" ${_rtSel.has(rtSelKey(r)) ? 'checked' : ''} onchange="rtToggleSel('${r.mktId}','${_rtEsc(String(r.id))}',this.checked)">
       ${r.imageUrl ? `<img class="rt-img" src="${_rtEsc(r.imageUrl)}" loading="lazy" onerror="this.style.visibility='hidden'">` : '<div class="rt-img"></div>'}
       <div class="rt-main">
         <div class="rt-ids">
@@ -4107,7 +4128,11 @@ function rtItemHtml(r) {
       ${a.statusUrl ? `<a class="rt-link" href="${_rtEsc(a.statusUrl)}" target="_blank" rel="noopener">🔎 İade/Refund Durumu</a>` : ''}
       ${a.labelUrl ? `<a class="rt-link" href="${_rtEsc(a.labelUrl)}" target="_blank" rel="noopener">🏷️ İade Etiketi</a>` : ''}
       <a class="rt-link" href="https://panel.sellerflash.com/returns" target="_blank" rel="noopener">SF İadeler</a>
-      <button class="rt-btn sm dark" onclick="checkReturnNow('${r.mktId}','${_rtEsc(String(r.id))}',this)">🔄 Şimdi Kontrol Et</button>
+      ${r.dismissed
+        ? `<button class="rt-btn sm" onclick="dismissReturns([{mktId:'${r.mktId}',id:'${_rtEsc(String(r.id))}'}],true)">↩ Geri Al</button>
+           <span class="rt-age">🗑 ${_rtAgo(r.dismissedAt)} silindi</span>`
+        : `<button class="rt-btn sm dark" onclick="checkReturnNow('${r.mktId}','${_rtEsc(String(r.id))}',this)">🔄 Şimdi Kontrol Et</button>
+           <button class="rt-btn sm danger" onclick="if(confirm('${_rtEsc(r.sid)} iadesi panelden silinsin mi?\\n(SF\\'de kalır; bir daha kontrol edilmez. Silinenler\\'den geri alınabilir.)'))dismissReturns([{mktId:'${r.mktId}',id:'${_rtEsc(String(r.id))}'}])">🗑 Sil</button>`}
       <span class="rt-checked">${a.checkedAt ? `.com kontrol: ${_rtAgo(a.checkedAt)}` : '.com kontrol: —'}</span>
     </div>
   </div>`;
@@ -4159,6 +4184,90 @@ async function checkReturnNow(mktId, returnId, btn) {
     if (_rtPanelOpen) renderReturnsPanel();
     else if (btn) { btn.disabled = false; btn.innerHTML = orig; }
   }
+}
+
+// ── Silme (kalıcı gizleme) ─────────────────────────────────────────────────
+const _rtSel = new Set(); // "mktId:id"
+function rtSelKey(r) { return `${r.mktId}:${r.id}`; }
+function rtToggleSel(mktId, id, on) {
+  const k = `${mktId}:${id}`;
+  if (on) _rtSel.add(k); else _rtSel.delete(k);
+  const el = document.getElementById(`rt-item-${mktId}-${id}`);
+  if (el) el.classList.toggle('sel', !!on);
+  renderReturnsSelBar(rtFiltered());
+}
+function rtSelectAllVisible(on) {
+  for (const r of rtFiltered()) { if (on) _rtSel.add(rtSelKey(r)); else _rtSel.delete(rtSelKey(r)); }
+  renderReturnsList();
+}
+function renderReturnsSelBar(list) {
+  const bar = document.getElementById('rt-selbar');
+  if (!bar) return;
+  const n = _rtSel.size;
+  if (!n) { bar.innerHTML = ''; return; }
+  const isDel = _rtStatus === 'DISMISSED';
+  const allSel = list.length && list.every(r => _rtSel.has(rtSelKey(r)));
+  bar.innerHTML = `<div class="rt-selbar">
+    <span>${n} iade seçili</span><span class="sp"></span>
+    <button class="rt-btn sm" onclick="rtSelectAllVisible(${allSel ? 'false' : 'true'})">${allSel ? 'Görünenleri bırak' : `Görünenlerin tümünü seç (${list.length})`}</button>
+    <button class="rt-btn sm" onclick="_rtSel.clear();renderReturnsList()">Seçimi temizle</button>
+    ${isDel
+      ? `<button class="rt-btn sm" style="background:#059669;border-color:#059669" onclick="dismissSelected(true)">↩ Seçilenleri Geri Al</button>`
+      : `<button class="rt-btn sm danger" onclick="dismissSelected(false)">🗑 Seçilenleri Sil</button>`}
+  </div>`;
+}
+function dismissSelected(restore) {
+  const items = [..._rtSel].map(k => { const i = k.indexOf(':'); return { mktId: k.slice(0, i), id: k.slice(i + 1) }; });
+  if (!items.length) return;
+  if (!restore && !confirm(`${items.length} iade panelden silinsin mi?\n\nSF'de kalırlar ama bir daha kontrol edilmez ve listede görünmez.\n"🗑 Silinenler" bölümünden geri alınabilir.`)) return;
+  dismissReturns(items, restore);
+}
+function dismissOldReturns() {
+  const ans = prompt(`Kaç günden eski iadeler silinsin?${_rtMkt ? `\n(Sadece: ${_rtStores[_rtMkt] || _rtMkt})` : '\n(Tüm mağazalar)'}`, '30');
+  if (ans === null) return;
+  const days = parseInt(ans, 10);
+  if (!(days > 0)) { showToast('Geçerli bir gün sayısı gir', 'error'); return; }
+  const items = rtAllRecords().filter(r => (!_rtMkt || r.mktId === _rtMkt) && (rtAgeDays(r) ?? 0) >= days);
+  if (!items.length) { showToast(`${days} günden eski iade yok`); return; }
+  const noRet = items.filter(r => rtVerdict(r).key === 'NO_RETURN').length;
+  if (!confirm(`${items.length} iade (${days}+ gün) panelden silinecek.${noRet ? `\n⚠️ Bunların ${noRet} tanesinde .com iadesi hâlâ açılmamış görünüyor!` : ''}\n\nDevam edilsin mi? ("🗑 Silinenler"den geri alınabilir.)`)) return;
+  dismissReturns(items.map(r => ({ mktId: r.mktId, id: String(r.id) })), false);
+}
+async function dismissReturns(items, restore = false) {
+  const serverUrl = getServerUrl();
+  if (!serverUrl || !CFG.apiKey) { showToast('Ayarlar\'dan Sunucu URL ve API Key gir', 'error'); return; }
+  const byMkt = {};
+  for (const it of items) (byMkt[it.mktId] = byMkt[it.mktId] || []).push(String(it.id));
+  // İyimser güncelleme (hata olursa geri alınır)
+  const backup = [];
+  for (const [mktId, ids] of Object.entries(byMkt)) for (const id of ids) {
+    const rec = _rtData[mktId]?.[id]; if (!rec) continue;
+    backup.push([rec, rec.dismissed, rec.dismissedAt]);
+    if (restore) { delete rec.dismissed; delete rec.dismissedAt; } else { rec.dismissed = true; rec.dismissedAt = Date.now(); }
+    _rtSel.delete(`${mktId}:${id}`);
+  }
+  refreshReturnsBadge(); renderReturnsPanel();
+  let changed = 0;
+  try {
+    for (const [mktId, ids] of Object.entries(byMkt)) {
+      const res = await fetch(`${serverUrl}/returns/dismiss`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mktId, returnIds: ids, restore: !!restore }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok) throw new Error(d.error || `HTTP ${res.status}`);
+      changed += d.changed || 0;
+    }
+    showToast(restore ? `${items.length} iade geri alındı` : `${items.length} iade silindi`);
+  } catch (e) {
+    for (const [rec, dis, at] of backup) {
+      if (dis) { rec.dismissed = dis; rec.dismissedAt = at; } else { delete rec.dismissed; delete rec.dismissedAt; }
+    }
+    showToast((restore ? 'Geri alınamadı: ' : 'Silinemedi: ') + e.message, 'error');
+    // Kısmi başarı olabilir → sunucudaki güncel hali çek
+    loadReturns().then(() => { if (_rtPanelOpen) renderReturnsPanel(); }).catch(() => {});
+  }
+  refreshReturnsBadge(); if (_rtPanelOpen) renderReturnsPanel();
 }
 
 function exportReturnsCsv() {
