@@ -3874,6 +3874,8 @@ const RT_COS = {
   WAIT_TRACKING: { label: 'Cosity: takip no bekleniyor', icon: '⏳', c: '#64748b', cb: '#f1f5f9' },
 };
 const RT_COS_STEP = { validate: 'Ön kontrol', login: 'Cosity girişi', asin: 'ASIN sorgusu', product: 'Ürün kaydı', deposit: 'Bakiye kontrolü', rvt: 'İade formu', save: 'İade kaydı' };
+// Cosity arayüzündeki numara: RS-(iç Id + 1000). Eski kayıtlarda rsNo alanı yok → hesaplanır.
+function rtCosRs(c) { return (c && (c.rsNo || (c.returnShipmentId ? `RS-${Number(c.returnShipmentId) + 1000}` : ''))) || ''; }
 function rtCos(r) { const s = r.cosity && r.cosity.status; return (s && RT_COS[s]) ? s : null; }
 function rtCosHtml(r) {
   const s = rtCos(r); if (!s) return '';
@@ -3881,7 +3883,7 @@ function rtCosHtml(r) {
   const id = `'${r.mktId}','${_rtEsc(String(r.id))}'`;
   let detail = '', btn = '';
   if (s === 'DONE') {
-    detail = `<a class="rt-link" href="https://app.cosityship.com/ReturnShipment/Index?id=${encodeURIComponent(c.returnShipmentId)}&pagetype=edit" target="_blank" rel="noopener">🆔 Cosity #${_rtEsc(c.returnShipmentId)}</a> <span class="rt-age">${_rtAgo(c.doneAt || c.at)}${c.manual ? ' · manuel' : ' · otomatik'}</span>`;
+    detail = `<a class="rt-link" href="https://app.cosityship.com/ReturnShipment/Index?id=${encodeURIComponent(c.returnShipmentId)}&pagetype=edit" target="_blank" rel="noopener">🆔 ${_rtEsc(rtCosRs(c))}</a> <span class="rt-age">${_rtAgo(c.doneAt || c.at)}${c.manual ? ' · manuel' : ' · otomatik'}</span>`;
   } else if (s === 'ERROR' || s === 'UNKNOWN') {
     detail = `<span style="color:${m.c};font-size:12px">${_rtEsc(RT_COS_STEP[c.step] || c.step || '')}: ${_rtEsc(c.error || '')}</span> <span class="rt-age">${c.attempts || 1}. deneme · ${_rtAgo(c.at)}</span>`;
     btn = s === 'UNKNOWN'
@@ -3910,7 +3912,7 @@ async function sendReturnToCosity(mktId, returnId, btn, force) {
     const d = await res.json().catch(() => ({}));
     if (d.record && _rtData[mktId]) _rtData[mktId][returnId] = d.record;
     if (!d.ok) throw new Error(d.error || `HTTP ${res.status}`);
-    showToast(`✅ Cosity'ye kayıt yapıldı (#${d.record?.cosity?.returnShipmentId || '?'})`);
+    showToast(`✅ Cosity'ye kayıt yapıldı (${rtCosRs(d.record?.cosity) || '?'})`);
   } catch (e) {
     showToast('Cosity kaydı başarısız: ' + e.message, 'error');
   } finally {
@@ -4138,7 +4140,7 @@ function rtFiltered() {
   if (_rtCos === 'ERROR') list = list.filter(r => ['ERROR', 'UNKNOWN'].includes(rtCos(r)));
   else if (_rtCos !== 'all') list = list.filter(r => rtCos(r) === _rtCos);
   const q = _rtSearch.trim().toLowerCase();
-  if (q) list = list.filter(r => [r.sid, r.buyerOrderId, r.asin, r.trackingNumber, r.rmaNumber, r.amazon?.rmaId, r.carrier, _rtStores[r.mktId]]
+  if (q) list = list.filter(r => [r.sid, r.buyerOrderId, r.asin, r.trackingNumber, r.rmaNumber, r.amazon?.rmaId, r.carrier, _rtStores[r.mktId], rtCosRs(r.cosity)]
     .some(v => v && String(v).toLowerCase().includes(q)));
   const created = r => _rtTs(r.createDate);
   if (_rtSort === 'new') list.sort((a, b) => created(b) - created(a));
