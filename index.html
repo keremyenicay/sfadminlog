@@ -3888,7 +3888,7 @@ function rtCosHtml(r) {
     detail = `<span style="color:${m.c};font-size:12px">${_rtEsc(RT_COS_STEP[c.step] || c.step || '')}: ${_rtEsc(c.error || '')}</span> <span class="rt-age">${c.attempts || 1}. deneme · ${_rtAgo(c.at)}</span>`;
     btn = s === 'UNKNOWN'
       ? `<a class="rt-link" href="https://app.cosityship.com/ReturnShipmentList/ReturnShipmentCustomerList" target="_blank" rel="noopener">🔎 Cosity'de kontrol et</a>
-         <button class="rt-btn sm" onclick="if(confirm('Kayıt Cosity\'de oluşmuş olabilir!\nCosity iadeler listesinde ${_rtEsc(r.sid)} yoksa devam edin.\n\nYeniden gönderilsin mi?'))sendReturnToCosity(${id},this,true)">🔁 Yine de gönder</button>`
+         <button class="rt-btn sm" onclick="if(confirm('Kayıt Cosity\\'de oluşmuş olabilir!\\nCosity iadeler listesinde ${_rtEsc(r.sid)} yoksa devam edin.\\n\\nYeniden gönderilsin mi?'))sendReturnToCosity(${id},this,true)">🔁 Yine de gönder</button>`
       : `<button class="rt-btn sm dark" onclick="sendReturnToCosity(${id},this,false)">🔁 Tekrar dene</button>`;
   } else if (s === 'PENDING') {
     btn = `<button class="rt-btn sm primary" onclick="sendReturnToCosity(${id},this,false)">📦 Cosity'ye Gönder</button>`;
@@ -3897,6 +3897,70 @@ function rtCosHtml(r) {
   }
   return `<div class="rt-trk" style="border-color:${m.c}33;background:${m.cb}">
     <div class="rt-trk-head" style="margin-bottom:0"><span class="rt-trk-title" style="color:${m.c}">${m.icon} ${m.label}</span>${detail}${btn ? `<span class="sp" style="flex:1"></span>${btn}` : ''}</div></div>`;
+}
+
+// .com iadesi açma + etiketi Cosity'ye yükleme (Cosity kaydı yapılmış iadelerde)
+const RT_AMZRET = {
+  OPENING:         { label: '.com iadesi açılıyor…',            icon: '⏳', c: '#0284c7', cb: '#f0f9ff' },
+  DONE:            { label: '.com iadesi açıldı · etiket yüklendi', icon: '📮', c: '#059669', cb: '#ecfdf5' },
+  LABEL_READY:     { label: '.com iadesi açık · etiket yüklenemedi', icon: '❌', c: '#e11d48', cb: '#fff1f2' },
+  NEEDS_ATTENTION: { label: 'Dikkat: iade seçeneğini değiştirmek gerekiyor', icon: '⚠️', c: '#c2410c', cb: '#fff7ed' },
+  UNKNOWN:         { label: '.com iadesi belirsiz',             icon: '⚠️', c: '#c2410c', cb: '#fff7ed' },
+  ERROR:           { label: '.com iadesi açılamadı',            icon: '❌', c: '#e11d48', cb: '#fff1f2' },
+};
+const RT_AMZRET_STEP = { precheck: 'Ön kontrol', login: 'Amazon girişi', cart: 'İade sepeti', reason: 'İade nedeni', resolution: 'Para iadesi seçimi', method: 'Gönderim yöntemi', address: 'Adres değişikliği', confirm: 'İade onayı', label: 'Etiket indirme', upload: 'Cosity yükleme', start: 'Başlangıç' };
+function rtAmzRetHtml(r) {
+  if (rtCos(r) !== 'DONE') return '';
+  const a = r.amzReturn || {}, s = a.status;
+  const id = `'${r.mktId}','${_rtEsc(String(r.id))}'`;
+  const amzUrl = (a.buyerOrderId || r.buyerOrderId) ? `https://www.amazon.com/gp/your-account/order-details/?orderID=${encodeURIComponent(a.buyerOrderId || r.buyerOrderId)}` : null;
+  const amzLink = amzUrl ? `<a class="rt-link" href="${amzUrl}" target="_blank" rel="noopener">🛒 .com siparişi</a>` : '';
+  if (!s) {
+    return `<div class="rt-trk"><div class="rt-trk-head" style="margin-bottom:0"><span class="rt-trk-title">📮 .com iadesi + etiket</span>
+      <span class="rt-age">Henüz açılmadı</span><span class="sp" style="flex:1"></span>
+      <button class="rt-btn sm primary" onclick="if(confirm('${_rtEsc(r.sid)} için .com\\'da iade açılsın ve etiket Cosity\\'ye yüklensin mi?'))startAmazonReturn(${id},this,false)">📮 .com iadesi aç + etiketi yükle</button></div></div>`;
+  }
+  const m = RT_AMZRET[s] || RT_AMZRET.ERROR;
+  let detail = '', btn = '';
+  if (s === 'DONE') {
+    detail = `${a.rmaId ? `<span class="rt-age">RMA <b style="font-family:var(--mono)">${_rtEsc(a.rmaId)}</b></span>` : ''}
+      ${a.fileName ? `<span class="rt-age">📎 ${_rtEsc(a.fileName)}</span>` : ''}
+      ${a.labelUrl ? `<a class="rt-link" href="${_rtEsc(a.labelUrl)}" target="_blank" rel="noopener">🏷️ Etiket</a>` : ''}
+      <span class="rt-age">${_rtAgo(a.doneAt || a.at)}</span>`;
+  } else if (s === 'OPENING') {
+    detail = `<span class="rt-age">başladı ${_rtAgo(a.at)} — “↻ Yenile” ile sonucu gör</span>`;
+  } else {
+    detail = `<span style="color:${m.c};font-size:12px">${_rtEsc(RT_AMZRET_STEP[a.step] || a.step || '')}: ${_rtEsc(a.error || '')}</span> <span class="rt-age">${a.attempts || 1}. deneme · ${_rtAgo(a.at)}</span>`;
+    btn = s === 'UNKNOWN'
+      ? `${amzLink}<button class="rt-btn sm" onclick="if(confirm('.com\\'da iade açılmış olabilir! Sistem önce mevcut iadeyi arar; bulamazsa yeniden açar.\\n\\nDevam edilsin mi?'))startAmazonReturn(${id},this,true)">🔁 Yine de dene</button>`
+      : `${s === 'NEEDS_ATTENTION' ? amzLink : ''}<button class="rt-btn sm dark" onclick="startAmazonReturn(${id},this,false)">🔁 ${s === 'LABEL_READY' ? 'Etiketi tekrar yükle' : 'Tekrar dene'}</button>`;
+  }
+  return `<div class="rt-trk" style="border-color:${m.c}33;background:${m.cb}">
+    <div class="rt-trk-head" style="margin-bottom:0"><span class="rt-trk-title" style="color:${m.c}">${m.icon} ${m.label}</span>${detail}${btn ? `<span class="sp" style="flex:1"></span>${btn}` : ''}</div></div>`;
+}
+
+async function startAmazonReturn(mktId, returnId, btn, force) {
+  const serverUrl = getServerUrl();
+  if (!serverUrl || !CFG.apiKey) { showToast('Ayarlar\'dan Sunucu URL ve API Key gir', 'error'); return; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Kuyruğa alınıyor…'; }
+  try {
+    const res = await fetch(`${serverUrl}/returns/amazon-return`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mktId, returnId, force: !!force }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.ok) throw new Error(d.error || `HTTP ${res.status}`);
+    showToast(d.msg || '.com iade işlemi başladı');
+    if (_rtData[mktId] && _rtData[mktId][returnId]) {
+      _rtData[mktId][returnId].amzReturn = { ...(_rtData[mktId][returnId].amzReturn || {}), status: 'OPENING', at: Date.now(), error: null };
+    }
+    // Sonucu birkaç kez otomatik yenile
+    [30000, 70000, 120000, 180000].forEach(t => setTimeout(() => { if (_rtPanelOpen) loadReturns().then(renderReturnsPanel); }, t));
+  } catch (e) {
+    showToast('.com iade işlemi başlatılamadı: ' + e.message, 'error');
+  } finally {
+    if (_rtPanelOpen) renderReturnsPanel();
+  }
 }
 
 async function sendReturnToCosity(mktId, returnId, btn, force) {
@@ -4243,6 +4307,7 @@ function rtItemHtml(r) {
       ${money}
     </div>
     ${rtCosHtml(r)}
+    ${rtAmzRetHtml(r)}
     ${rtTrackingHtml(r)}
     <div class="rt-tl">${tl}</div>
     <div class="rt-foot">
