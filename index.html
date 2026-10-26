@@ -1347,6 +1347,13 @@ td { padding: 16px 24px; vertical-align: middle; }
         <button class="cmd-btn cmd-btn-depo-refresh" onclick="if(confirm('Supabase\'deki tüm siparişlerin SF kargo ücretleri (wareHouseCost), sipariş tarihinin kuruyla yeniden hesaplanıp SF\'ye yazılsın mı?\n\nGüvenlidir, tekrar çalıştırılabilir. Sonuç Telegram\'a gelir.'))triggerCmdAll('kargo_kur',this)">💱 Kargo Kur Düzelt</button>
         <button class="cmd-btn cmd-btn-stop" onclick="triggerCmdAll('durdur',this)">⏹ Durdur</button>
       </div>
+      <div class="cmd-section-title">Sipariş Sıfırla</div>
+      <div class="cmd-global-row" style="align-items:center">
+        <input id="cmd-reset-sid" type="text" inputmode="numeric" placeholder="Sipariş no (ör. 304-5593598-6729950)" autocomplete="off" autocorrect="off" autocapitalize="off"
+          style="flex:1 1 220px;min-width:0;padding:9px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg1);color:var(--text1);font-size:13px"
+          onkeydown="if(event.key==='Enter')resetOrderCmd(document.getElementById('cmd-reset-btn'))">
+        <button class="cmd-btn cmd-btn-stop" id="cmd-reset-btn" onclick="resetOrderCmd(this)">🔁 Sıfırla</button>
+      </div>
       <div class="cmd-section-title">Mağaza Seç</div>
       <div class="cmd-mkt-tabs" id="cmd-mkt-tabs"></div>
       <div id="cmd-mkt-buttons" class="cmd-mkt-btn-grid"></div>
@@ -2894,6 +2901,30 @@ async function triggerCmdAll(cmd, btn) {
     }
   } catch(e) {
     showCmdResult(`Bağlantı hatası: ${e.message}`, false);
+  }
+  if (btn) btn.classList.remove('loading');
+}
+
+// Yanlış verilmiş Amazon siparişini yeniden vermek için: sunucu sid'i DB_*, ORDER_BOT_PRICE,
+// ORDERBOT_NOTIFIED, bekleyen ve Amazon kuyruğundan siler (depo kodu korunur).
+// SF'deki eski Amazon sipariş ID'si elle silinmeli; sonra Sipariş Tara ile panele geri gelir.
+async function resetOrderCmd(btn) {
+  const input = document.getElementById('cmd-reset-sid');
+  const sid = (input.value || '').trim();
+  if (!/^\d{3}-\d{7}-\d{7}$/.test(sid)) { showCmdResult('Geçerli bir sipariş numarası girin (ör. 304-5593598-6729950)', false); return; }
+  if (!confirm(`${sid} sıfırlansın mı?\n\nSupabase'deki kayıtları (mağaza DB, fiyat, bildirim, kuyruklar) silinir; depo kodu korunur.\n\nSonra SF'deki eski Amazon sipariş ID'sini elle silip "Sipariş Tara" deyin.`)) return;
+  if (btn) btn.classList.add('loading');
+  try {
+    const res = await fetch(`${getServerUrl()}/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd: 'siparis_sifirla', sid })
+    });
+    const data = await res.json();
+    if (data.ok) { showCmdResult(escHtml(data.msg || `${sid} sıfırlandı`)); input.value = ''; refreshAll(); }
+    else showCmdResult(escHtml(data.error || 'Sunucu hatası'), false);
+  } catch (e) {
+    showCmdResult(`Bağlantı hatası: ${escHtml(e.message)}`, false);
   }
   if (btn) btn.classList.remove('loading');
 }
