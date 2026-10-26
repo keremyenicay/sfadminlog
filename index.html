@@ -1486,10 +1486,26 @@ async function sbPut(key, value) {
   }
 }
 
+// ─── Önbellekli okuma ─────────────────────────────────────────────────────────
+// Realtime hangi anahtarın değiştiğini bildirir; yenilemede yalnızca o anahtarlar
+// yeniden indirilir, geri kalanı önbellekten gelir. dirty = null → hepsini taze çek
+// (elle yenileme / buton sonrası). Aynı yenileme turundaki tekrar istekler birleşir.
+const _sbCache = new Map(); // key → { gen, p }
+let _sbGen = 0;
+function sbGetC(key, dirty) {
+  const e = _sbCache.get(key);
+  const stale = !e || (dirty === null ? e.gen !== _sbGen : dirty.has(key));
+  if (!stale) return e.p;
+  const p = sbGet(key);
+  _sbCache.set(key, { gen: _sbGen, p });
+  p.catch(() => { if (_sbCache.get(key)?.p === p) _sbCache.delete(key); });
+  return p;
+}
+
 // ─── DATA FETCH ───────────────────────────────────────────────────────────────
-async function fetchStoreName(mktId) {
+async function fetchStoreName(mktId, dirty = null) {
   try {
-    const raw = await sbGet('ACCOUNTS');
+    const raw = await sbGetC('ACCOUNTS', dirty);
     if (!raw) return `Mağaza ${mktId}`;
     const accounts = (typeof raw === 'object') ? raw : JSON.parse(raw);
     const account = Array.isArray(accounts)
@@ -1521,18 +1537,21 @@ function stateCls(state) {
   return { new:'s-new', priced:'s-priced', ordered:'s-ordered', amazon:'s-amazon', done:'s-done', skipped:'s-skipped' }[state] || '';
 }
 
-async function fetchAllData() {
+let _fxCache = null; // { at, rates }
+async function fetchAllData(dirty = null) {
+  if (dirty === null) _sbGen++;
   setConnState('loading');
   const newOrders = [];
 
   const storeNames = {};
   await Promise.all(CFG.mkts.map(async (mktId) => {
-    storeNames[mktId] = await fetchStoreName(mktId);
+    storeNames[mktId] = await fetchStoreName(mktId, dirty);
   }));
 
   // Canlı kur çek (EUR, GBP, AUD → TRY)
   let _rates = { EUR: 1, GBP: 1, AUD: 1 };
-  try {
+  if (_fxCache && Date.now() - _fxCache.at < 30 * 60000) _rates = _fxCache.rates;
+  else try {
     const rRes = await fetch('https://api.exchangerate-api.com/v4/latest/TRY');
     if (rRes.ok) {
       const rJson = await rRes.json();
@@ -1541,6 +1560,7 @@ async function fetchAllData() {
       if (r.EUR) _rates.EUR = 1 / r.EUR;
       if (r.GBP) _rates.GBP = 1 / r.GBP;
       if (r.AUD) _rates.AUD = 1 / r.AUD;
+      _fxCache = { at: Date.now(), rates: _rates };
     }
   } catch(e) {}
   window._fxRates = _rates;
@@ -1553,7 +1573,7 @@ async function fetchAllData() {
   const dbCache = {};
   await Promise.all(CFG.mkts.map(async (mktId) => {
     try {
-      const rawDb = await sbGet(`DB_${mktId}`);
+      const rawDb = await sbGetC(`DB_${mktId}`, dirty);
       dbCache[mktId] = rawDb ? ((typeof rawDb === 'object') ? rawDb : JSON.parse(rawDb)) : {};
     } catch(e) { dbCache[mktId] = {}; }
   }));
@@ -1596,7 +1616,7 @@ async function fetchAllData() {
 
   for (const mktId of CFG.mkts) {
     try {
-      const raw = await sbGet(`ORDER_BOT_PENDING_${mktId}`);
+      const raw = await sbGetC(`ORDER_BOT_PENDING_${mktId}`, dirty);
       if (!raw) continue;
       const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
 
@@ -1631,7 +1651,7 @@ async function fetchAllData() {
         let prices = order.prices || null;
         if (!prices) {
           try {
-            const pr = await sbGet(`ORDER_BOT_PRICE_${sid}`);
+            const pr = await sbGetC(`ORDER_BOT_PRICE_${sid}`, dirty);
             if (pr) prices = (typeof pr === 'object') ? pr : JSON.parse(pr);
           } catch(e) {}
         }
@@ -1656,7 +1676,7 @@ async function fetchAllData() {
 
   let azStatus = null;
   try {
-    const azRaw = await sbGet('AMAZON_AUTO_ORDER');
+    const azRaw = await sbGetC('AMAZON_AUTO_ORDER', dirty);
     if (azRaw && azRaw !== '' && azRaw !== 'null') {
       azStatus = (typeof azRaw === 'object') ? azRaw : JSON.parse(azRaw);
     }
@@ -1665,7 +1685,7 @@ async function fetchAllData() {
 
   // ─── Queue'yu da çek ───────────────────────────────────────────────────────
   try {
-    const qRaw = await sbGet('AMAZON_AUTO_ORDER_QUEUE');
+    const qRaw = await sbGetC('AMAZON_AUTO_ORDER_QUEUE', dirty);
     if (qRaw && qRaw !== '' && qRaw !== 'null') {
       _amazonQueue = typeof qRaw === 'object' ? qRaw : JSON.parse(qRaw);
     } else {
@@ -2555,16 +2575,28 @@ function showToast(msg, type='success') {
   _toastTimer = setTimeout(() => { el.className = ''; }, 3000);
 }
 
-async function refreshAll() {
-  if (_isRefreshing) return; 
+// dirty: değişen anahtarlar (Set) — yalnızca onlar yeniden indirilir; null/Event → tam yenileme.
+// Yenileme sürerken gelen istekler kaybolmaz, bitince birleştirilip tekrar çalışır.
+let _refreshQueued = undefined; // undefined: yok, null: tam, Set: anahtarlar
+async function refreshAll(dirty = null) {
+  if (!(dirty instanceof Set)) dirty = null;
+  if (_isRefreshing) {
+    if (dirty === null || _refreshQueued === null) _refreshQueued = null;
+    else _refreshQueued = new Set([...(_refreshQueued || []), ...dirty]);
+    return;
+  }
   _isRefreshing = true;
   try {
-    await fetchAllData();
+    await fetchAllData(dirty);
   } catch(e) {
     setConnState('error');
     showToast('Bağlantı hatası: ' + e.message, 'error');
   } finally {
     _isRefreshing = false;
+  }
+  if (_refreshQueued !== undefined) {
+    const q = _refreshQueued; _refreshQueued = undefined;
+    return refreshAll(q);
   }
 }
 
@@ -4067,17 +4099,23 @@ function rtTrackUrl(r) {
   return `https://www.google.com/search?q=${n}`;
 }
 
-async function loadReturns() {
-  const mkts = (CFG.mkts && CFG.mkts.length) ? CFG.mkts : [];
-  const next = {};
+// only: yalnızca bu mağazaların iadelerini yeniden indir (realtime); verilmezse hepsi.
+const _rtDirty = new Set(); // panel kapalıyken değişen RETURNS_ mağazaları
+let _rtLoadedOnce = false, _rtDirtyFlushAt = 0;
+async function loadReturns(only = null) {
+  const all = (CFG.mkts && CFG.mkts.length) ? CFG.mkts : [];
+  const mkts = only ? all.filter(m => only.includes(String(m))) : all;
+  const next = only ? { ..._rtData } : {};
   await Promise.all(mkts.map(async mktId => {
     try {
       const v = await sbGet(`RETURNS_${mktId}`);
       next[mktId] = (v && typeof v === 'object') ? v : {};
     } catch (e) { next[mktId] = _rtData[mktId] || {}; }
+    _rtDirty.delete(String(mktId));
     if (!_rtStores[mktId]) { try { _rtStores[mktId] = await fetchStoreName(mktId); } catch (e) { _rtStores[mktId] = mktId; } }
   }));
   _rtData = next;
+  if (!only) _rtLoadedOnce = true;
   refreshReturnsBadge();
 }
 
@@ -4119,7 +4157,9 @@ function toggleReturnsPanel() {
   if (logoText) logoText.innerHTML = _rtPanelOpen ? '<span>İadeler</span>' : 'Seller<span>Flash</span>';
   if (_rtPanelOpen) {
     renderReturnsPanel();
-    loadReturns().then(renderReturnsPanel).catch(() => {});
+    // Panel kapalıyken iade verisi yenilenmez; açılınca yalnızca değişenler (ilk açılışta hepsi) çekilir
+    const p = !_rtLoadedOnce ? loadReturns() : _rtDirty.size ? loadReturns([..._rtDirty]) : null;
+    if (p) p.then(renderReturnsPanel).catch(() => {});
   }
 }
 
@@ -4214,8 +4254,16 @@ function rtFiltered() {
   return list;
 }
 
-function renderReturnsList() {
+// Liste parça parça çizilir: önce RT_PAGE kart, kaydırdıkça (veya butonla) devamı.
+// Filtre/arama/sıralama değişince baştan başlar; veri yenilenince gösterilen sayı korunur.
+const RT_PAGE = 50;
+let _rtLimit = RT_PAGE, _rtFilterSig = '', _rtObserver = null;
+function rtShowMore() { _rtLimit += RT_PAGE; renderReturnsList(true); }
+function renderReturnsList(keep = false) {
   const list = rtFiltered();
+  const sig = [_rtStatus, _rtMkt, _rtSearch, _rtSf, _rtAmz, _rtCos, _rtSort].join('|');
+  if (sig !== _rtFilterSig && !keep) _rtLimit = RT_PAGE;
+  _rtFilterSig = sig;
   const total = rtAllRecords(_rtStatus === 'DISMISSED').length;
   document.getElementById('rt-count').textContent = total ? `${list.length} / ${total} ${_rtStatus === 'DISMISSED' ? 'silinmiş ' : ''}iade gösteriliyor` : '';
   // Görünmeyenleri seçimden düşür
@@ -4227,7 +4275,17 @@ function renderReturnsList() {
     el.innerHTML = `<div class="rt-empty">${total ? 'Bu filtreye uygun iade yok.' : '📭 Henüz iade verisi yok.<br><span style="font-size:12px">Sunucu her saat SF iadelerini çeker — hemen başlatmak için “İadeleri Tara”.</span>'}</div>`;
     return;
   }
-  el.innerHTML = list.map(rtItemHtml).join('');
+  const shown = list.slice(0, _rtLimit);
+  const rest = list.length - shown.length;
+  el.innerHTML = shown.map(rtItemHtml).join('') + (rest > 0
+    ? `<div id="rt-more" class="rt-empty" style="padding:14px;cursor:pointer" onclick="rtShowMore()">⬇ Daha fazla göster (${rest} iade daha)</div>` : '');
+  if (_rtObserver) { _rtObserver.disconnect(); _rtObserver = null; }
+  const more = document.getElementById('rt-more');
+  if (more && 'IntersectionObserver' in window) {
+    _rtObserver = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) rtShowMore(); },
+      { root: document.getElementById('returns-view'), rootMargin: '600px' });
+    _rtObserver.observe(more);
+  }
 }
 
 function rtItemHtml(r) {
@@ -4521,20 +4579,44 @@ function exportReturnsCsv() {
 // ─── Supabase Realtime — anlık güncelleme (polling fallback korunur) ──────────
 let _sbRealtime = null;
 let _rtDebounce = null;
+let _rtLive = false;
+const _rtPendingKeys = new Set();
+// Ana panelin kullandığı anahtarlar; diğerleri (MSG_, LAST_, SF_TOKEN_, ORDER_BOT_PRICE vb.) yok sayılır
+const MAIN_KEY_RE = /^(DB_\d+|ORDER_BOT_PENDING_\d+|ORDER_BOT_PRICE_.+|AMAZON_AUTO_ORDER(_QUEUE)?|ACCOUNTS)$/;
+function flushRealtimeKeys() {
+  const keys = [..._rtPendingKeys]; _rtPendingKeys.clear();
+  const main = new Set(keys.filter(k => MAIN_KEY_RE.test(k)));
+  if (main.size) refreshAll(main).catch(() => {});
+  const rtMkts = keys.filter(k => /^RETURNS_\d+$/.test(k)).map(k => k.slice(8));
+  if (!rtMkts.length) return;
+  if (_rtPanelOpen) loadReturns(rtMkts).then(renderReturnsPanel).catch(() => {});
+  else rtMkts.forEach(m => _rtDirty.add(m));
+}
 function setupRealtime() {
   try {
     if (_sbRealtime || !window.supabase || !CFG.url || !CFG.key) return;
     const client = window.supabase.createClient(CFG.url, CFG.key, { realtime: { params: { eventsPerSecond: 2 } } });
-    _sbRealtime = client.channel('sf_store_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_store' }, () => {
+    // sf_store_events: sf_store'daki her değişiklikte yalnızca { key, updated_at } yazılır (tetikleyici).
+    // Tam satırı (yüzlerce KB) dinlemek yerine bunu dinleyip yalnızca değişen anahtarı indiriyoruz.
+    _sbRealtime = client.channel('sf_store_events')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sf_store_events' }, (payload) => {
+        const key = payload?.new?.key;
+        if (!key) return;
+        _rtPendingKeys.add(key);
         clearTimeout(_rtDebounce);
-        _rtDebounce = setTimeout(() => { refreshAll().catch(() => {}); if (_rtPanelOpen) loadReturns().then(renderReturnsPanel).catch(() => {}); }, 400);
+        _rtDebounce = setTimeout(flushRealtimeKeys, 400);
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          console.log('[Realtime] sf_store aboneliği aktif — polling 60 sn\'ye düşürüldü');
+          _rtLive = true;
+          console.log('[Realtime] sf_store_events aboneliği aktif — tam yenileme 5 dk\'ya düşürüldü');
           clearInterval(_autoRefresh);
-          _autoRefresh = setInterval(refreshAll, 60000); // realtime varken polling seyrek (fallback)
+          _autoRefresh = setInterval(refreshAll, 300000); // güvenlik ağı: arada kaçan olay olursa
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          if (_rtLive) console.log('[Realtime] bağlantı koptu — 30 sn polling');
+          _rtLive = false;
+          clearInterval(_autoRefresh);
+          _autoRefresh = setInterval(refreshAll, 30000);
         }
       });
   } catch (e) { console.log('[Realtime] kurulamadı, polling devam:', e.message); }
@@ -4551,7 +4633,14 @@ async function init() {
   setupRealtime();
   loadMsgQueues().catch(() => {});
   loadReturns().catch(() => {});
-  setInterval(() => loadReturns().then(() => { if (_rtPanelOpen) renderReturnsPanel(); }).catch(() => {}), 120000);
+  setInterval(() => {
+    // Açıkken: realtime yoksa 2 dk'da bir tam yenile. Kapalıyken: yalnızca rozet için değişenleri 10 dk'da bir.
+    if (_rtPanelOpen) { if (!_rtLive) loadReturns().then(renderReturnsPanel).catch(() => {}); }
+    else if (_rtDirty.size && Date.now() - _rtDirtyFlushAt > 600000) {
+      _rtDirtyFlushAt = Date.now();
+      loadReturns([..._rtDirty]).catch(() => {});
+    }
+  }, 120000);
 }
 
 if (loadConfig() && CFG.url && CFG.key) {
