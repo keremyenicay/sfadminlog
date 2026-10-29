@@ -4369,7 +4369,7 @@ function rtItemHtml(r) {
     ? `<div class="rt-money">${a.refundTotal != null ? `İade <b style="color:#059669">${_rtMoney(a.refundTotal)}</b>` : `Tutar <b>${_rtMoney(a.grandTotal)}</b>`}${a.refundTotal != null && a.grandTotal != null ? `<div>/ ${_rtMoney(a.grandTotal)} sipariş</div>` : ''}</div>` : '<div></div>';
 
   const steps = [
-    ['SF iade açıldı', r.createDate, true],
+    [r.source === 'amazon' ? 'İade açıldı' : 'SF iade açıldı', r.createDate, true],
     ['Müşteri kargoda', null, !!r.trackingNumber],
     ['Depoya ulaştı', r.warehouseDeliveryDate, !!r.warehouseDeliveryDate],
     ['Amazon\'a çıktı', r.warehouseSentDate, !!r.warehouseSentDate],
@@ -4399,8 +4399,9 @@ function rtItemHtml(r) {
         </div>
         <div class="rt-sub">
           ${r.carrier || r.trackingNumber ? `<span>🚚 <b>${_rtEsc(r.carrier || '?')}</b> ${r.trackingNumber ? (trk ? `<a href="${_rtEsc(trk)}" target="_blank" rel="noopener" style="color:var(--seller-blue);font-family:var(--mono)">${_rtEsc(r.trackingNumber)}</a>` : _rtEsc(r.trackingNumber)) : ''}</span>` : '<span>🚚 Etiket henüz yok</span>'}
-          ${r.rmaNumber ? `<span>SF RMA <b style="font-family:var(--mono)">${_rtEsc(r.rmaNumber)}</b></span>` : ''}
-          <span>SF ücret <b>${_rtMoney(r.totalCharge)}</b> ${r.isPaid ? '<span style="color:#059669;font-weight:700">· ödendi</span>' : '<span style="color:#d97706;font-weight:700">· ödenmedi</span>'}</span>
+          ${r.rmaNumber && r.source !== 'amazon' ? `<span>SF RMA <b style="font-family:var(--mono)">${_rtEsc(r.rmaNumber)}</b></span>` : ''}
+          ${r.source === 'amazon' ? '<span style="color:var(--text3)">Kaynak: Amazon API</span>'
+            : `<span>SF ücret <b>${_rtMoney(r.totalCharge)}</b> ${r.isPaid ? '<span style="color:#059669;font-weight:700">· ödendi</span>' : '<span style="color:#d97706;font-weight:700">· ödenmedi</span>'}</span>`}
         </div>
         ${(() => { const z = r.amzApi; if (!z) return '';
           const zt = z.trackingId ? rtTrackUrl({ carrier: z.carrier, trackingNumber: z.trackingId }) : null;
@@ -4418,7 +4419,7 @@ function rtItemHtml(r) {
           return st ? `<span class="rt-verdict" style="--c:${st.c};--cb:${st.cb}">${st.icon} ${st.label}</span>`
                     : `<span class="rt-verdict" style="--c:${v.c};--cb:${v.cb}">${v.icon} ${v.label}</span>`; })()}
         ${rtIsDelayed(r) ? `<span class="rt-pill" style="color:#c2410c;background:#fff7ed">⚠️ .com iadesi gecikmeli</span>` : ''}
-        <span class="rt-pill" style="color:${sf.c};background:${sf.c}14">SF: ${sf.label}</span>
+        <span class="rt-pill" style="color:${sf.c};background:${sf.c}14">${r.source === 'amazon' ? 'İade' : 'SF'}: ${sf.label}</span>
         ${rtCos(r) ? `<span class="rt-pill" style="color:${RT_COS[rtCos(r)].c};background:${RT_COS[rtCos(r)].cb}">${RT_COS[rtCos(r)].icon} ${RT_COS[rtCos(r)].label}</span>` : ''}
         ${(() => { const lu = rtLabelUnusedDays(r);
           if (lu !== null && lu >= RT_LABEL_UNUSED_DAYS) return `<span class="rt-age bad">⏰ ${lu} gündür .com etiketi kullanılmadı</span>`;
