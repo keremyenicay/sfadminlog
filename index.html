@@ -3726,7 +3726,7 @@ let rows = Object.values(db).filter(o => {
       ...Object.entries(realByCur).map(([cur,val]) => ({ label: `${cur} Gerçek kâr (Amazon, ${realN} sipariş)`, val, cur, isTRY: false })),
       { label: 'Gerçek kâr ₺', val: realTRY, isTRY: true },
     ] : []),
-    ...(pendN ? [{ label: 'Amazon ödemesi bekleyen', val: pendN, isCount: true }] : []),
+    ...(pendN ? [{ label: 'Kargo bekleyen (Amazon)', val: pendN, isCount: true }] : []),
   ];
   summaryEl.innerHTML = summaryCards.map(c => `
     <div class="profit-summary-card">
@@ -3757,10 +3757,10 @@ let rows = Object.values(db).filter(o => {
         <div style="font-size:10px;color:var(--text3);margin-top:1px;">${o.storeName||o.mktId||'—'} · ${fmtDate(o.orderDate)}</div>
         <div style="font-size:9px;color:var(--text3);margin-top:2px;font-family:var(--mono);">💱 ${fmtDate(o.orderDate)} kuru: 1${curSym} = ₺${fmtRate(dayRate)}</div>
         ${(() => { const f = amzOf(o); if (!f) return '';
-          if (f.realProfit == null) return `<div style="font-size:10px;color:var(--text3);margin-top:2px;">🛰 ${f.pending ? 'Amazon ödemesi bekleniyor' : 'Gerçek kâr hesaplanamadı (alış bilgisi yok)'}</div>`;
+          if (f.realProfit == null) return `<div style="font-size:10px;color:var(--text3);margin-top:2px;">🛰 ${f.pending ? 'Amazon: kargolanınca hesaplanacak' : 'Gerçek kâr hesaplanamadı (alış bilgisi yok)'}</div>`;
           const c = f.realProfit >= 0 ? 'var(--seller-green)' : 'var(--red)';
           const tip = `Amazon net ${fmtCur(f.net,cur)} = satış ${fmtCur(f.sales,cur)}, ücret ${fmtCur(f.fees,cur)}, KDV/GST ${fmtCur(f.withheld,cur)}, promosyon ${fmtCur(f.promotions,cur)}, iade ${fmtCur(f.refunds,cur)} · alış ${fmtCur(f.purchaseLocal||0,cur)} · depo ${fmtCur(f.whCostLocal||0,cur)}`;
-          return `<div style="font-size:11px;margin-top:2px;" title="${tip}">🛰 Gerçek: <b style="color:${c};font-family:var(--mono)">${fmtCur(f.realProfit,cur)}</b> <span style="color:var(--text3);font-size:10px">(Amazon net ${fmtCur(f.net,cur)})</span></div>`; })()}
+          return `<div style="font-size:11px;margin-top:2px;" title="${tip}">🛰 Gerçek: <b style="color:${c};font-family:var(--mono)">${fmtCur(f.realProfit,cur)}</b> <span style="color:var(--text3);font-size:10px">(Amazon net ${fmtCur(f.net,cur)}${f.deferred ? ' · ertelenmiş' : ''})</span></div>`; })()}
       </div>
       <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${profitColor};text-align:right;white-space:nowrap;">${fmtCur(p,cur)}</div>
       <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:#dc2626;text-align:right;white-space:nowrap;">${fmtTRY(tryVal)}</div>
