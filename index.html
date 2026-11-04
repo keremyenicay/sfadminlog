@@ -4842,7 +4842,8 @@ async function swRefresh() {
       + `Takipte <b>${(ls.stores || []).length}</b> mağaza · son tarama ${swAgo(s.lastRunAt)}${s.durationMin != null ? ` (${s.durationMin} dk)` : ''}`
       + (l.stores != null ? ` · ${l.stores} mağaza, ${l.pages} sayfa, <b>${l.newTotal} yeni / ${l.sellable} satılabilir</b>${l.sent ? `, ${l.sent} SF'ye gitti` : ''}` : '')
       + ` · bekleyen: <b>${st.foundSellable || 0}</b> satılabilir (${st.found || 0})`
-      + (s.captcha ? `<br><span style="color:#d97706;">⚠️ Son taramada Amazon doğrulama (captcha) istedi — sonraki taramada kaldığı yerden devam eder.</span>` : '');
+      + (s.captcha ? `<br><span style="color:#d97706;">⚠️ Son taramada Amazon doğrulama (captcha) istedi — sonraki taramada kaldığı yerden devam eder.</span>` : '')
+      + ((l.errors || []).length ? `<br><span style="color:#dc2626;">❌ Son taramada hata: ${(l.errors || []).slice(0, 3).map(swEsc).join(' · ')}</span>` : '');
     document.getElementById('sw-runall').disabled = running;
     document.getElementById('sw-stop').disabled = !running;
     const badge = document.getElementById('sw-badge');
