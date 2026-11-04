@@ -4801,6 +4801,7 @@ const SW_MP = { A1PA6795UKMFR9: ['🇩🇪', 'DE', 'amazon.de'], A13V1IB3VIYZZH:
   A1C3SOZRARQ6R3: ['🇵🇱', 'PL', 'amazon.pl'], A2NODRKZP88ZB9: ['🇸🇪', 'SE', 'amazon.se'], AMEN7PMS3EDWL: ['🇧🇪', 'BE', 'amazon.com.be'],
   A39IBJ37TRP1C6: ['🇦🇺', 'AU', 'amazon.com.au'], ATVPDKIKX0DER: ['🇺🇸', 'US', 'amazon.com'] };
 const SW_STATUS = { ok: '✅ Satılabilir', approval: '🔒 Onay gerekli', no: '⛔ Satılamaz', unknown: '❔ Bilinmiyor' };
+const SW_BLOCK = { 'captcha-form': 'karakter girilen captcha', 'continue-button': '"alışverişe devam et" ara sayfası', 'http-503': 'erişim engeli (503)', empty: 'ürünsüz sayfa' };
 let _swOpen = false, _swTimer = null, _swStores = [], _swFound = [], _swCfgLoaded = false;
 const swEsc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const swAgo = t => { if (!t) return '—'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'az önce' : m < 60 ? `${m} dk önce` : m < 1440 ? `${Math.round(m / 60)} sa önce` : `${Math.round(m / 1440)} gün önce`; };
@@ -4843,6 +4844,7 @@ async function swRefresh() {
       + (l.stores != null ? ` · ${l.stores} mağaza, ${l.pages} sayfa, <b>${l.newTotal} yeni / ${l.sellable} satılabilir</b>${l.sent ? `, ${l.sent} SF'ye gitti` : ''}` : '')
       + ` · bekleyen: <b>${st.foundSellable || 0}</b> satılabilir (${st.found || 0})`
       + (s.captcha ? `<br><span style="color:#d97706;">⚠️ Son taramada Amazon doğrulama (captcha) istedi — sonraki taramada kaldığı yerden devam eder.</span>` : '')
+      + (s.block ? `<br><span style="color:#d97706;">🖼️ Amazon'un gösterdiği sayfa: <b>${swEsc(SW_BLOCK[s.block.kind] || s.block.kind)}</b> (HTTP ${swEsc(s.block.status)})${s.block.title ? ` · “${swEsc(s.block.title)}”` : ''} · ${swAgo(s.block.at)} — ekran görüntüsü Telegram'a gönderildi</span>` : '')
       + ((l.errors || []).length ? `<br><span style="color:#dc2626;">❌ Son taramada hata: ${(l.errors || []).slice(0, 3).map(swEsc).join(' · ')}</span>` : '');
     document.getElementById('sw-runall').disabled = running;
     document.getElementById('sw-stop').disabled = !running;
