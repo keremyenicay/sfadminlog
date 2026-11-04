@@ -1093,7 +1093,7 @@ td { padding: 16px 24px; vertical-align: middle; }
       <button class="icon-btn" onclick="swRefresh()" title="Yenile">↻</button>
       <button class="icon-btn" onclick="closeStoreWatch()" title="Kapat">✕</button>
     </div>
-    <div style="font-size:12px;color:var(--text3);line-height:1.5;">Mağazalar sunucuda (Railway) ayrı bir tarayıcıyla taranır; .com siparişleri etkilenmez. Yeni eklenen mağaza hemen taranır, sonra her gece otomatik takip edilir. Eklentideki takip listesi de burada görünür.</div>
+    <div style="font-size:12px;color:var(--text3);line-height:1.5;">Mağazaları senin Chrome'undaki asin-alici eklentisi tarar (Amazon sunucudan otomatik erişimi kapatıyor). Buradan mağaza ekleyince ya da ▶ deyince iş oluşur; Chrome'da açık bir Amazon sekmesi varsa ~1 dk içinde başlar, yoksa Chrome açılınca devam eder. Her gece seçilen saatte de iş oluşur. Eklentideki takip listesi de burada görünür.</div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px;">
       <label style="font-size:11px;color:var(--text3);font-weight:700;">ÜLKE
@@ -4838,13 +4838,14 @@ async function swRefresh() {
       document.getElementById('sw-maxpages').value = c.maxPages || 600;
       _swCfgLoaded = true;
     }
-    const running = !!(s.running || ls.running);
-    document.getElementById('sw-status').innerHTML = (running ? '<b>⏳ Sunucuda tarama sürüyor…</b><br>' : '')
+    const running = !!(s.running || ls.running), jb = s.job;
+    const idle = jb && (!jb.heartbeatAt || Date.now() - jb.heartbeatAt > 5 * 60000);
+    document.getElementById('sw-status').innerHTML = (jb ? `<b>⏳ Tarama işi: ${jb.done}/${jb.total} mağaza</b>${jb.heartbeatAt ? ` · tarayıcıdan son haber ${swAgo(jb.heartbeatAt)}` : ''}`
+        + (idle ? `<br><span style="color:#d97706;">Bekliyor — Chrome'da asin-alici eklentisi yüklü bir Amazon sekmesi açık olmalı.</span>` : jb.current ? ` · sırada: ${swEsc(jb.current)}` : '') + '<br>' : '')
       + `Takipte <b>${(ls.stores || []).length}</b> mağaza · son tarama ${swAgo(s.lastRunAt)}${s.durationMin != null ? ` (${s.durationMin} dk)` : ''}`
       + (l.stores != null ? ` · ${l.stores} mağaza, ${l.pages} sayfa, <b>${l.newTotal} yeni / ${l.sellable} satılabilir</b>${l.sent ? `, ${l.sent} SF'ye gitti` : ''}` : '')
       + ` · bekleyen: <b>${st.foundSellable || 0}</b> satılabilir (${st.found || 0})`
-      + (s.captcha ? `<br><span style="color:#d97706;">⚠️ Son taramada Amazon doğrulama (captcha) istedi — sonraki taramada kaldığı yerden devam eder.</span>` : '')
-      + (s.block ? `<br><span style="color:#d97706;">🖼️ Amazon'un gösterdiği sayfa: <b>${swEsc(SW_BLOCK[s.block.kind] || s.block.kind)}</b> (HTTP ${swEsc(s.block.status)})${s.block.title ? ` · “${swEsc(s.block.title)}”` : ''} · ${swAgo(s.block.at)} — ekran görüntüsü Telegram'a gönderildi</span>` : '')
+      + (s.block && s.block.kind !== 'empty' ? `<br><span style="color:#d97706;">🖼️ Amazon'un gösterdiği sayfa: <b>${swEsc(SW_BLOCK[s.block.kind] || s.block.kind)}</b> (HTTP ${swEsc(s.block.status)})${s.block.title ? ` · “${swEsc(s.block.title)}”` : ''} · ${swAgo(s.block.at)} — ilgili mağazalar sonraki taramada tekrar denenecek</span>` : '')
       + ((l.errors || []).length ? `<br><span style="color:#dc2626;">❌ Son taramada hata: ${(l.errors || []).slice(0, 3).map(swEsc).join(' · ')}</span>` : '');
     document.getElementById('sw-runall').disabled = running;
     document.getElementById('sw-stop').disabled = !running;
