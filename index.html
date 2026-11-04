@@ -1085,6 +1085,73 @@ td { padding: 16px 24px; vertical-align: middle; }
 </head>
 <body>
 
+<!-- MAĞAZA TAKİBİ -->
+<div id="sw-overlay" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px;" onclick="if(event.target===this)closeStoreWatch()">
+  <div style="background:var(--bg2,#fff);color:var(--text);width:100%;max-width:980px;border-radius:18px;box-shadow:0 20px 60px rgba(15,23,42,.25);padding:20px;display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="font-size:18px;font-weight:800;flex:1;">🏪 Mağaza Takibi</div>
+      <button class="icon-btn" onclick="swRefresh()" title="Yenile">↻</button>
+      <button class="icon-btn" onclick="closeStoreWatch()" title="Kapat">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--text3);line-height:1.5;">Mağazalar sunucuda (Railway) ayrı bir tarayıcıyla taranır; .com siparişleri etkilenmez. Yeni eklenen mağaza hemen taranır, sonra her gece otomatik takip edilir. Eklentideki takip listesi de burada görünür.</div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px;">
+      <label style="font-size:11px;color:var(--text3);font-weight:700;">ÜLKE
+        <select id="sw-country" class="cfg-input" style="padding:10px;margin-top:4px;">
+          <option value="A1PA6795UKMFR9">🇩🇪 Almanya</option><option value="A13V1IB3VIYZZH">🇫🇷 Fransa</option><option value="APJ6JRA9NG5V4">🇮🇹 İtalya</option>
+          <option value="A1RKKUPIHCS9HS">🇪🇸 İspanya</option><option value="A1805IZSGTT6HS">🇳🇱 Hollanda</option><option value="A1F83G8C2ARO7P">🇬🇧 İngiltere</option>
+          <option value="A1C3SOZRARQ6R3">🇵🇱 Polonya</option><option value="A2NODRKZP88ZB9">🇸🇪 İsveç</option><option value="AMEN7PMS3EDWL">🇧🇪 Belçika</option>
+          <option value="A39IBJ37TRP1C6">🇦🇺 Avustralya</option><option value="ATVPDKIKX0DER">🇺🇸 ABD</option>
+        </select></label>
+      <label style="font-size:11px;color:var(--text3);font-weight:700;">MERCHANT ID
+        <input id="sw-seller" class="cfg-input" placeholder="A1B2C3D4E5F6G7" style="padding:10px;margin-top:4px;" autocomplete="off" autocapitalize="characters"></label>
+      <label style="font-size:11px;color:var(--text3);font-weight:700;">İSİM (OPSİYONEL)
+        <input id="sw-name" class="cfg-input" placeholder="Rakip mağaza" style="padding:10px;margin-top:4px;font-family:inherit;"></label>
+      <button onclick="swAddStore()" id="sw-add-btn" style="padding:12px;border:none;border-radius:12px;background:var(--sf-grad);color:#fff;font-weight:700;cursor:pointer;">＋ Ekle ve taramaya başla</button>
+      <label style="grid-column:1/-1;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;"><input id="sw-importall" type="checkbox" checked> İlk taramada mağazanın mevcut tüm ürünlerini de al (uygunluk kontrolüyle; SF'ye otomatik gitmez, aşağıdan onaylarsın)</label>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;">
+      <label style="display:flex;align-items:center;gap:6px;"><input id="sw-enabled" type="checkbox"> Her gece otomatik tara</label>
+      <select id="sw-hour" class="cfg-input" style="width:auto;padding:6px 10px;"></select>
+      <select id="sw-action" class="cfg-input" style="width:auto;padding:6px 10px;font-family:inherit;">
+        <option value="pool">Yeni ürünler beklesin</option><option value="sf">Satılabilir yenileri otomatik SF'ye gönder</option><option value="notify">Sadece Telegram</option></select>
+      <input id="sw-maxpages" class="cfg-input" type="number" min="20" max="3000" style="width:90px;padding:6px 10px;" title="Gece sayfa sınırı">
+      <button onclick="swSaveCfg()" style="padding:7px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--bg1);cursor:pointer;">💾 Kaydet</button>
+      <span style="flex:1;"></span>
+      <button onclick="swRunAll()" id="sw-runall" style="padding:7px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--bg1);cursor:pointer;">▶ Tümünü şimdi tara</button>
+      <button onclick="swStop()" id="sw-stop" style="padding:7px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--bg1);cursor:pointer;">■ Durdur</button>
+    </div>
+    <div id="sw-status" style="font-size:12px;color:var(--text2);line-height:1.6;"></div>
+
+    <div style="overflow:auto;border:1px solid var(--border);border-radius:12px;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="text-align:left;background:var(--bg3);">
+          <th style="padding:8px;">Ülke</th><th style="padding:8px;">Mağaza</th><th style="padding:8px;">Merchant ID</th><th style="padding:8px;">Kaynak</th>
+          <th style="padding:8px;">Ürün</th><th style="padding:8px;">Son tarama</th><th style="padding:8px;">Bekleyen</th><th style="padding:8px;"></th>
+        </tr></thead>
+        <tbody id="sw-stores"><tr><td colspan="8" style="padding:12px;color:var(--text3);">Yükleniyor…</td></tr></tbody>
+      </table>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--border);padding-top:12px;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div style="font-weight:700;flex:1;">Bulunan ürünler</div>
+        <select id="sw-found-mp" class="cfg-input" style="width:auto;padding:6px 10px;font-family:inherit;" onchange="swLoadFound()"></select>
+        <select id="sw-found-filter" class="cfg-input" style="width:auto;padding:6px 10px;font-family:inherit;" onchange="swRenderFound()">
+          <option value="ok">✅ Satılabilir</option><option value="all">Hepsi</option><option value="approval">🔒 Onay gerekli</option><option value="no">⛔ Satılamaz</option></select>
+        <button onclick="swSendFound()" style="padding:7px 12px;border:none;border-radius:10px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;">📤 Satılabilirleri SF'ye gönder</button>
+        <button onclick="swCsvFound()" style="padding:7px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--bg1);cursor:pointer;">⬇️ CSV</button>
+        <button onclick="swClearFound()" style="padding:7px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--bg1);cursor:pointer;">🗑️ Listeyi temizle</button>
+      </div>
+      <div id="sw-found-count" style="font-size:12px;color:var(--text3);"></div>
+      <div style="max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:12px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody id="sw-found"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- CONFIG -->
 <div id="config-overlay">
   <div id="config-box">
@@ -1149,6 +1216,10 @@ td { padding: 16px 24px; vertical-align: middle; }
     </button>
     <button class="icon-btn" id="search-back-btn" onclick="toggleSearchPanel()" title="Geri Dön" style="display:none;background:rgba(2,132,199,0.12);border-color:rgba(2,132,199,0.3);color:var(--seller-blue);font-size:16px;font-weight:700;">
       ←
+    </button>
+    <button class="icon-btn" id="sw-tab-btn" onclick="openStoreWatch()" title="Mağaza Takibi" style="position:relative;">
+      🏪
+      <span id="sw-badge" style="display:none;position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#16a34a;color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;"></span>
     </button>
     <button class="icon-btn" id="search-tab-btn" onclick="toggleSearchPanel()" title="Sipariş Ara" style="position:relative;">
       🔍
@@ -4723,6 +4794,163 @@ if (loadConfig() && CFG.url && CFG.key) {
 }
 
 window.addEventListener('resize', () => renderOrders());
+
+// ── MAĞAZA TAKİBİ (sunucu: /hunt/storewatch/*) ──────────────────────────────
+const SW_MP = { A1PA6795UKMFR9: ['🇩🇪', 'DE', 'amazon.de'], A13V1IB3VIYZZH: ['🇫🇷', 'FR', 'amazon.fr'], APJ6JRA9NG5V4: ['🇮🇹', 'IT', 'amazon.it'],
+  A1RKKUPIHCS9HS: ['🇪🇸', 'ES', 'amazon.es'], A1805IZSGTT6HS: ['🇳🇱', 'NL', 'amazon.nl'], A1F83G8C2ARO7P: ['🇬🇧', 'UK', 'amazon.co.uk'],
+  A1C3SOZRARQ6R3: ['🇵🇱', 'PL', 'amazon.pl'], A2NODRKZP88ZB9: ['🇸🇪', 'SE', 'amazon.se'], AMEN7PMS3EDWL: ['🇧🇪', 'BE', 'amazon.com.be'],
+  A39IBJ37TRP1C6: ['🇦🇺', 'AU', 'amazon.com.au'], ATVPDKIKX0DER: ['🇺🇸', 'US', 'amazon.com'] };
+const SW_STATUS = { ok: '✅ Satılabilir', approval: '🔒 Onay gerekli', no: '⛔ Satılamaz', unknown: '❔ Bilinmiyor' };
+let _swOpen = false, _swTimer = null, _swStores = [], _swFound = [], _swCfgLoaded = false;
+const swEsc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const swAgo = t => { if (!t) return '—'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'az önce' : m < 60 ? `${m} dk önce` : m < 1440 ? `${Math.round(m / 60)} sa önce` : `${Math.round(m / 1440)} gün önce`; };
+
+async function swApi(method, path, body) {
+  const base = getServerUrl();
+  if (!base || !CFG.apiKey) throw new Error('Ayarlar → Sunucu URL ve API Key gerekli');
+  const res = await fetch(base + path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + res.status));
+  return j;
+}
+
+function openStoreWatch() {
+  _swOpen = true;
+  document.getElementById('sw-overlay').style.display = 'flex';
+  const h = document.getElementById('sw-hour');
+  if (!h.options.length) h.innerHTML = [...Array(24)].map((_, i) => `<option value="${i}">${String(i).padStart(2, '0')}:00</option>`).join('');
+  const fm = document.getElementById('sw-found-mp');
+  if (!fm.options.length) fm.innerHTML = Object.entries(SW_MP).map(([mp, [f, cc]]) => `<option value="${mp}">${f} ${cc}</option>`).join('');
+  swRefresh();
+}
+function closeStoreWatch() { _swOpen = false; clearTimeout(_swTimer); document.getElementById('sw-overlay').style.display = 'none'; }
+
+async function swRefresh() {
+  clearTimeout(_swTimer);
+  try {
+    const [st, ls] = await Promise.all([swApi('GET', '/hunt/storewatch/status'), swApi('GET', '/hunt/storewatch/stores')]);
+    const c = st.cfg || {}, s = st.status || {}, l = s.last || {};
+    if (!_swCfgLoaded) {
+      document.getElementById('sw-enabled').checked = !!c.enabled;
+      document.getElementById('sw-hour').value = String(c.hour ?? 3);
+      document.getElementById('sw-action').value = c.action || 'pool';
+      document.getElementById('sw-maxpages').value = c.maxPages || 600;
+      _swCfgLoaded = true;
+    }
+    const running = !!(s.running || ls.running);
+    document.getElementById('sw-status').innerHTML = (running ? '<b>⏳ Sunucuda tarama sürüyor…</b><br>' : '')
+      + `Takipte <b>${(ls.stores || []).length}</b> mağaza · son tarama ${swAgo(s.lastRunAt)}${s.durationMin != null ? ` (${s.durationMin} dk)` : ''}`
+      + (l.stores != null ? ` · ${l.stores} mağaza, ${l.pages} sayfa, <b>${l.newTotal} yeni / ${l.sellable} satılabilir</b>${l.sent ? `, ${l.sent} SF'ye gitti` : ''}` : '')
+      + ` · bekleyen: <b>${st.foundSellable || 0}</b> satılabilir (${st.found || 0})`
+      + (s.captcha ? `<br><span style="color:#d97706;">⚠️ Son taramada Amazon doğrulama (captcha) istedi — sonraki taramada kaldığı yerden devam eder.</span>` : '');
+    document.getElementById('sw-runall').disabled = running;
+    document.getElementById('sw-stop').disabled = !running;
+    const badge = document.getElementById('sw-badge');
+    if (badge) { badge.style.display = st.foundSellable ? '' : 'none'; badge.textContent = st.foundSellable || ''; }
+    _swStores = ls.stores || [];
+    swRenderStores(running);
+    swLoadFound();
+    if (_swOpen && running) _swTimer = setTimeout(swRefresh, 8000);
+  } catch (e) {
+    document.getElementById('sw-status').innerHTML = `<span style="color:#dc2626;">${swEsc(e.message)}</span>`;
+    document.getElementById('sw-stores').innerHTML = '';
+  }
+}
+
+function swRenderStores(running) {
+  const tb = document.getElementById('sw-stores');
+  if (!_swStores.length) { tb.innerHTML = '<tr><td colspan="8" style="padding:12px;color:var(--text3);">Takipte mağaza yok. Yukarıdan ekleyebilirsin.</td></tr>'; return; }
+  tb.innerHTML = _swStores.map(s => {
+    const m = SW_MP[s.marketplaceID] || ['', s.marketplaceID, s.host];
+    const url = `https://www.${m[2] || s.host}/s?me=${encodeURIComponent(s.sellerId)}&marketplaceID=${s.marketplaceID}`;
+    const scanning = s.queued || (running && !s.scannedAt);
+    return `<tr style="border-top:1px solid var(--border);">
+      <td style="padding:8px;white-space:nowrap;">${m[0]} ${swEsc(m[1])}</td>
+      <td style="padding:8px;"><a href="${url}" target="_blank" rel="noopener" style="color:var(--seller-blue);font-weight:600;">${swEsc(s.name || '—')}</a></td>
+      <td style="padding:8px;font-family:var(--mono);">${swEsc(s.sellerId)}</td>
+      <td style="padding:8px;color:var(--text3);">${s.src === 'panel' ? 'Panel' : 'Eklenti'}</td>
+      <td style="padding:8px;">${s.products == null ? (scanning ? '⏳' : '—') : Number(s.products).toLocaleString()}</td>
+      <td style="padding:8px;white-space:nowrap;">${s.queued ? 'sırada' : swAgo(s.scannedAt)}</td>
+      <td style="padding:8px;">${s.found ? `<b>${s.foundSellable}</b> / ${s.found}` : '—'}</td>
+      <td style="padding:8px;white-space:nowrap;">
+        <button onclick="swScanOne('${swEsc(s.sellerId)}','${swEsc(s.marketplaceID)}')" title="Bu mağazayı şimdi tara" style="border:1px solid var(--border2);background:var(--bg1);border-radius:8px;padding:4px 8px;cursor:pointer;">▶</button>
+        ${s.src === 'panel' ? `<button onclick="swRemove('${swEsc(s.sellerId)}','${swEsc(s.marketplaceID)}')" title="Takipten çıkar" style="border:1px solid var(--border2);background:var(--bg1);border-radius:8px;padding:4px 8px;cursor:pointer;">🗑️</button>` : ''}
+      </td></tr>`;
+  }).join('');
+}
+
+async function swAddStore() {
+  const sellerId = document.getElementById('sw-seller').value.trim().toUpperCase();
+  const marketplaceID = document.getElementById('sw-country').value;
+  const name = document.getElementById('sw-name').value.trim();
+  if (!/^[A-Z0-9]{8,20}$/.test(sellerId)) return swNotify('Geçerli bir Merchant ID gir (8–20 harf/rakam)', true);
+  const btn = document.getElementById('sw-add-btn');
+  btn.disabled = true;
+  try {
+    const r = await swApi('POST', '/hunt/storewatch/store/add', { sellerId, marketplaceID, name, scanNow: true, importAll: document.getElementById('sw-importall').checked });
+    document.getElementById('sw-seller').value = ''; document.getElementById('sw-name').value = '';
+    swNotify(r.scan === 'queued' ? 'Mağaza eklendi — şu anki tarama bitince taranacak' : (r.added ? 'Mağaza eklendi, tarama başladı' : 'Mağaza zaten listede, tarama başladı'));
+    setTimeout(swRefresh, 1500);
+  } catch (e) { swNotify(e.message, true); }
+  finally { btn.disabled = false; }
+}
+async function swScanOne(sellerId, marketplaceID) {
+  try { const r = await swApi('POST', '/hunt/storewatch/store/scan', { sellerId, marketplaceID }); swNotify(r.scan === 'queued' ? 'Sıraya alındı' : 'Tarama başladı'); setTimeout(swRefresh, 1500); }
+  catch (e) { swNotify(e.message, true); }
+}
+async function swRemove(sellerId, marketplaceID) {
+  if (!confirm(`${sellerId} takipten çıkarılsın mı?`)) return;
+  try { await swApi('POST', '/hunt/storewatch/store/remove', { sellerId, marketplaceID }); swRefresh(); } catch (e) { swNotify(e.message, true); }
+}
+async function swSaveCfg() {
+  try {
+    await swApi('POST', '/hunt/storewatch/config', { enabled: document.getElementById('sw-enabled').checked, hour: document.getElementById('sw-hour').value,
+      action: document.getElementById('sw-action').value, maxPages: document.getElementById('sw-maxpages').value });
+    swNotify('Ayar kaydedildi'); swRefresh();
+  } catch (e) { swNotify(e.message, true); }
+}
+async function swRunAll() { try { await swApi('POST', '/hunt/storewatch/run', {}); swNotify('Tüm mağazalar taranıyor'); setTimeout(swRefresh, 1500); } catch (e) { swNotify(e.message, true); } }
+async function swStop() { try { await swApi('POST', '/hunt/storewatch/stop', {}); swRefresh(); } catch (e) { swNotify(e.message, true); } }
+
+async function swLoadFound() {
+  const mp = document.getElementById('sw-found-mp').value;
+  try { _swFound = (await swApi('GET', `/hunt/storewatch/found?mp=${mp}`)).items || []; } catch (e) { _swFound = []; }
+  swRenderFound();
+}
+function swFoundVisible() { const f = document.getElementById('sw-found-filter').value; return _swFound.filter(x => f === 'all' || x.restriction === f); }
+function swRenderFound() {
+  const list = swFoundVisible(), mp = document.getElementById('sw-found-mp').value, host = (SW_MP[mp] || [])[2] || 'amazon.de';
+  document.getElementById('sw-found-count').textContent = `${list.length} ürün gösteriliyor · bu ülkede toplam ${_swFound.length} · satılabilir ${_swFound.filter(x => x.restriction === 'ok').length}`;
+  document.getElementById('sw-found').innerHTML = list.slice(0, 1500).map(x => `<tr style="border-top:1px solid var(--border);">
+    <td style="padding:6px 8px;font-family:var(--mono);"><a href="https://www.${host}/dp/${swEsc(x.asin)}" target="_blank" rel="noopener" style="color:var(--seller-blue);">${swEsc(x.asin)}</a></td>
+    <td style="padding:6px 8px;">${swEsc(x.store)}</td><td style="padding:6px 8px;white-space:nowrap;">${SW_STATUS[x.restriction] || swEsc(x.restriction)}</td>
+    <td style="padding:6px 8px;color:var(--text3);white-space:nowrap;">${swAgo(x.at)}</td></tr>`).join('') || '<tr><td style="padding:12px;color:var(--text3);">Bu ülkede bekleyen ürün yok.</td></tr>';
+}
+async function swSendFound() {
+  const mp = document.getElementById('sw-found-mp').value;
+  const n = _swFound.filter(x => x.restriction === 'ok').length;
+  if (!n) return swNotify('Gönderilecek satılabilir ürün yok', true);
+  if (!confirm(`${n} satılabilir ürün SellerFlash'a gönderilsin mi?`)) return;
+  try { const r = await swApi('POST', '/hunt/storewatch/found/send', { mp }); swNotify(r.error ? `SF: ${r.error}` : `${r.sent} ürün SF'ye gönderildi`, !!r.error); swRefresh(); }
+  catch (e) { swNotify(e.message, true); }
+}
+async function swClearFound() {
+  const mp = document.getElementById('sw-found-mp').value;
+  const list = swFoundVisible().map(x => x.asin);
+  if (!list.length || !confirm(`Gösterilen ${list.length} ürün listeden silinsin mi?`)) return;
+  try { await swApi('POST', '/hunt/storewatch/found/clear', { mp, asins: list }); swRefresh(); } catch (e) { swNotify(e.message, true); }
+}
+function swCsvFound() {
+  const list = swFoundVisible(); if (!list.length) return;
+  const csv = '﻿ASIN;Mağaza;Merchant ID;Durum;Bulunma\n' + list.map(x => [x.asin, x.store, x.sellerId, SW_STATUS[x.restriction] || x.restriction, new Date(x.at).toLocaleString('tr-TR')]
+    .map(v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`).join(';')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `magaza-takibi-${document.getElementById('sw-found-mp').value}.csv`; a.click();
+}
+function swNotify(msg, isErr) {
+  if (typeof showToast === 'function') return showToast(msg, isErr ? 'error' : undefined);
+  const el = document.getElementById('sw-status'); if (el) el.insertAdjacentHTML('afterbegin', `<div style="color:${isErr ? '#dc2626' : '#16a34a'};font-weight:600;">${swEsc(msg)}</div>`);
+}
 </script>
 </body>
 </html>
