@@ -4854,9 +4854,13 @@ async function swRefresh() {
       _swCfgLoaded = true;
     }
     const running = !!(s.running || ls.running), jb = s.job;
-    const idle = jb && (!jb.heartbeatAt || Date.now() - jb.heartbeatAt > 5 * 60000);
+    const unclaimed = jb && !jb.claimedAt && Date.now() - (jb.createdAt || 0) > 30000;
+    const idle = jb && !unclaimed && (!jb.heartbeatAt || Date.now() - jb.heartbeatAt > 5 * 60000);
     document.getElementById('sw-status').innerHTML = (jb ? `<b>⏳ Tarama işi: ${jb.done}/${jb.total} mağaza</b>${jb.heartbeatAt ? ` · tarayıcıdan son haber ${swAgo(jb.heartbeatAt)}` : ''}`
-        + (idle ? `<br><span style="color:#d97706;">Bekliyor — Chrome'da asin-alici eklentisi yüklü bir Amazon sekmesi açık olmalı.</span>` : jb.current ? ` · sırada: ${swEsc(jb.current)}` : '') + '<br>' : '')
+        + (unclaimed ? `<br><span style="color:#d97706;">Eklenti işi henüz almadı — Chrome'da eklentili bir Amazon sekmesi açık olmalı (açıksa sayfayı bir kez yenileyin; Tampermonkey betiği 5.3 sürümünde olmalı).</span>`
+            : idle ? `<br><span style="color:#d97706;">Tarayıcıdan haber yok — takip sekmesi kapanmış olabilir; Amazon sekmesi açıksa 1 dk içinde yeniden açılır.</span>`
+            : !jb.claimedAt ? `<br><span style="color:#64748b;">Chrome'daki Amazon sekmesi işi birkaç saniye içinde alır…</span>`
+            : jb.current ? ` · sırada: ${swEsc(jb.current)}` : '') + '<br>' : '')
       + `Takipte <b>${(ls.stores || []).length}</b> mağaza · son tarama ${swAgo(s.lastRunAt)}${s.durationMin != null ? ` (${s.durationMin} dk)` : ''}`
       + (l.stores != null ? ` · ${l.stores} mağaza, ${l.pages} sayfa, <b>${l.newTotal} yeni / ${l.sellable} satılabilir</b>${l.sent ? `, ${l.sent} SF'ye gitti` : ''}` : '')
       + ` · bekleyen: <b>${st.foundSellable || 0}</b> satılabilir (${st.found || 0})`
