@@ -1519,8 +1519,9 @@ function saveConfig() {
   const apiKey    = document.getElementById('cfg-apikey').value.trim();
   if (!url || !key) { showToast('URL ve Key zorunludur!', 'error'); return; }
   // Tarayıcı otomatik doldurması / karışıklık: Supabase anahtarı yerine sunucu API anahtarı girilmesin
-  if (!/^(eyJ|sb_publishable_)/.test(key) || (apiKey && key === apiKey)) {
-    showToast('Bu bir Supabase anahtarı değil — sunucu API anahtarını yanlış alana girmiş olabilirsin (eyJ… veya sb_publishable_… olmalı)', 'error');
+  // Gizlenmiş (•••) kopyalanan anahtar da reddedilir — yalnız harf/rakam . _ - olabilir
+  if (!/^(eyJ|sb_publishable_)[A-Za-z0-9._-]+$/.test(key) || key.length < 40 || (apiKey && key === apiKey)) {
+    showToast(/•/.test(key) ? 'Anahtar gizlenmiş (•••) kopyalanmış — Supabase\'de anahtarın tamamını kopyala' : 'Bu bir Supabase anahtarı değil — sunucu API anahtarını yanlış alana girmiş olabilirsin (eyJ… veya sb_publishable_… olmalı)', 'error');
     document.getElementById('cfg-key').focus();
     return;
   }
