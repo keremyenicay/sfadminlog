@@ -1093,7 +1093,7 @@ td { padding: 16px 24px; vertical-align: middle; }
       <button class="icon-btn" onclick="swRefresh()" title="Yenile">↻</button>
       <button class="icon-btn" onclick="closeStoreWatch()" title="Kapat">✕</button>
     </div>
-    <div style="font-size:12px;color:var(--text3);line-height:1.5;">Mağazaları senin Chrome'undaki asin-alici eklentisi tarar (Amazon sunucudan otomatik erişimi kapatıyor). Buradan mağaza ekleyince ya da ▶ deyince iş oluşur; Chrome'da açık bir Amazon sekmesi varsa ~1 dk içinde başlar, yoksa Chrome açılınca devam eder. Her gece seçilen saatte de iş oluşur. Eklentideki takip listesi de burada görünür.</div>
+    <div style="font-size:12px;color:var(--text3);line-height:1.5;">Mağazaları senin Chrome'undaki asin-alici eklentisi, <b>normal mağaza taramasıyla</b> tarar: her ülke için ayrı bir sekmede mağaza sayfası açılır, eklenti paneli kategorileri tek tek gezer, bitince sekme kapanır. Buradan mağaza ekleyince ya da ▶ deyince iş oluşur; Chrome'da açık bir Amazon sekmesi varsa ~1 dk içinde başlar (açılır pencere engellenirse sol alttaki rozete tıkla), yoksa Chrome açılınca devam eder. Her gece seçilen saatte de iş oluşur. Eklentideki takip listesi de burada görünür.</div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px;">
       <label style="font-size:11px;color:var(--text3);font-weight:700;">ÜLKE
@@ -1116,7 +1116,6 @@ td { padding: 16px 24px; vertical-align: middle; }
       <select id="sw-hour" class="cfg-input" style="width:auto;padding:6px 10px;"></select>
       <select id="sw-action" class="cfg-input" style="width:auto;padding:6px 10px;font-family:inherit;">
         <option value="pool">Yeni ürünler beklesin</option><option value="sf">Satılabilir yenileri otomatik SF'ye gönder</option><option value="notify">Sadece Telegram</option></select>
-      <input id="sw-maxpages" class="cfg-input" type="number" min="20" max="3000" style="width:90px;padding:6px 10px;" title="Gece sayfa sınırı">
       <button onclick="swSaveCfg()" style="padding:7px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--bg1);cursor:pointer;">💾 Kaydet</button>
       <span style="flex:1;"></span>
       <button onclick="swRunAll()" id="sw-runall" style="padding:7px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--bg1);cursor:pointer;">▶ Tümünü şimdi tara</button>
@@ -1163,13 +1162,13 @@ td { padding: 16px 24px; vertical-align: middle; }
     <div class="cfg-label">Supabase URL</div>
     <input class="cfg-input" id="cfg-url" type="url" placeholder="https://xxxx.supabase.co" autocomplete="off" autocorrect="off" autocapitalize="off">
     <div class="cfg-label">Supabase Anon Key</div>
-    <input class="cfg-input" id="cfg-key" type="password" placeholder="eyJ..." autocomplete="off">
+    <input class="cfg-input" id="cfg-key" type="text" placeholder="eyJ... veya sb_publishable_..." autocomplete="new-password" spellcheck="false" autocorrect="off" autocapitalize="off">
     <div class="cfg-label">Marketplace ID'ler (virgülle)</div>
     <input class="cfg-input" id="cfg-mkts" type="text" placeholder="78524,87709" value="78524,87709" autocomplete="off" autocorrect="off">
     <div class="cfg-label">Sunucu URL (Komut Paneli için)</div>
     <input class="cfg-input" id="cfg-server" type="url" placeholder="https://your-app.railway.app" autocomplete="off" autocorrect="off" autocapitalize="off">
     <div class="cfg-label">Sunucu API Key (Güvenlik)</div>
-    <input class="cfg-input" id="cfg-apikey" type="password" placeholder="Railway'de API_KEY env var ile aynı değer" autocomplete="off">
+    <input class="cfg-input" id="cfg-apikey" type="password" placeholder="Railway'de API_KEY env var ile aynı değer" autocomplete="new-password">
     <div class="cfg-note">🔒 Ayarlar yalnızca bu tarayıcıda (Local Storage) saklanır.</div>
     <button id="cfg-save">Bağlan →</button>
   </div>
@@ -1519,6 +1518,13 @@ function saveConfig() {
   const serverUrl = document.getElementById('cfg-server').value.trim().replace(/\/$/, '');
   const apiKey    = document.getElementById('cfg-apikey').value.trim();
   if (!url || !key) { showToast('URL ve Key zorunludur!', 'error'); return; }
+  // Tarayıcı otomatik doldurması / karışıklık: Supabase anahtarı yerine sunucu API anahtarı girilmesin
+  // Gizlenmiş (•••) kopyalanan anahtar da reddedilir — yalnız harf/rakam . _ - olabilir
+  if (!/^(eyJ|sb_publishable_)[A-Za-z0-9._-]+$/.test(key) || key.length < 40 || (apiKey && key === apiKey)) {
+    showToast(/•/.test(key) ? 'Anahtar gizlenmiş (•••) kopyalanmış — Supabase\'de anahtarın tamamını kopyala' : 'Bu bir Supabase anahtarı değil — sunucu API anahtarını yanlış alana girmiş olabilirsin (eyJ… veya sb_publishable_… olmalı)', 'error');
+    document.getElementById('cfg-key').focus();
+    return;
+  }
   CFG = { url, key, mkts, serverUrl, apiKey };
   localStorage.setItem('sf_cfg', JSON.stringify(CFG));
   document.getElementById('config-overlay').style.display = 'none';
@@ -1537,12 +1543,22 @@ function openSettings() {
 document.getElementById('cfg-save').onclick = saveConfig;
 
 // ─── SUPABASE REST ────────────────────────────────────────────────────────────
+// Supabase anahtarı geçersiz (401): yüzlerce sessiz hata yerine tek uyarı + ayarları aç
+let _sbAuthWarned = false;
+function _sbAuthFailed() {
+  if (_sbAuthWarned) return;
+  _sbAuthWarned = true;
+  showToast('Supabase anahtarı geçersiz (401) — Ayarlar\'dan "Supabase Anon Key" alanını kontrol et', 'error');
+  try { openSettings(); } catch (e) {}
+}
+
 async function sbGet(key) {
   const res = await fetch(`${CFG.url}/rest/v1/sf_store?key=eq.${encodeURIComponent(key)}&select=value&limit=1`, {
     headers: { 'apikey': CFG.key, 'Authorization': `Bearer ${CFG.key}`, 'Content-Type': 'application/json' }
   });
   if (!res.ok) {
     const txt = await res.text().catch(()=>'');
+    if (res.status === 401) _sbAuthFailed();
     throw new Error(`HTTP ${res.status}: ${txt.slice(0,100)}`);
   }
   const rows = await res.json();
@@ -4835,7 +4851,6 @@ async function swRefresh() {
       document.getElementById('sw-enabled').checked = !!c.enabled;
       document.getElementById('sw-hour').value = String(c.hour ?? 3);
       document.getElementById('sw-action').value = c.action || 'pool';
-      document.getElementById('sw-maxpages').value = c.maxPages || 600;
       _swCfgLoaded = true;
     }
     const running = !!(s.running || ls.running), jb = s.job;
@@ -4909,7 +4924,7 @@ async function swRemove(sellerId, marketplaceID) {
 async function swSaveCfg() {
   try {
     await swApi('POST', '/hunt/storewatch/config', { enabled: document.getElementById('sw-enabled').checked, hour: document.getElementById('sw-hour').value,
-      action: document.getElementById('sw-action').value, maxPages: document.getElementById('sw-maxpages').value });
+      action: document.getElementById('sw-action').value});
     swNotify('Ayar kaydedildi'); swRefresh();
   } catch (e) { swNotify(e.message, true); }
 }
