@@ -1116,7 +1116,6 @@ td { padding: 16px 24px; vertical-align: middle; }
       <select id="sw-hour" class="cfg-input" style="width:auto;padding:6px 10px;"></select>
       <select id="sw-action" class="cfg-input" style="width:auto;padding:6px 10px;font-family:inherit;">
         <option value="pool">Yeni ürünler beklesin</option><option value="sf">Satılabilir yenileri otomatik SF'ye gönder</option><option value="notify">Sadece Telegram</option></select>
-      <input id="sw-maxpages" class="cfg-input" type="number" min="20" max="3000" style="width:90px;padding:6px 10px;" title="Gece sayfa sınırı">
       <button onclick="swSaveCfg()" style="padding:7px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--bg1);cursor:pointer;">💾 Kaydet</button>
       <span style="flex:1;"></span>
       <button onclick="swRunAll()" id="sw-runall" style="padding:7px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--bg1);cursor:pointer;">▶ Tümünü şimdi tara</button>
@@ -4851,7 +4850,6 @@ async function swRefresh() {
       document.getElementById('sw-enabled').checked = !!c.enabled;
       document.getElementById('sw-hour').value = String(c.hour ?? 3);
       document.getElementById('sw-action').value = c.action || 'pool';
-      document.getElementById('sw-maxpages').value = c.maxPages || 600;
       _swCfgLoaded = true;
     }
     const running = !!(s.running || ls.running), jb = s.job;
@@ -4925,7 +4923,7 @@ async function swRemove(sellerId, marketplaceID) {
 async function swSaveCfg() {
   try {
     await swApi('POST', '/hunt/storewatch/config', { enabled: document.getElementById('sw-enabled').checked, hour: document.getElementById('sw-hour').value,
-      action: document.getElementById('sw-action').value, maxPages: document.getElementById('sw-maxpages').value });
+      action: document.getElementById('sw-action').value});
     swNotify('Ayar kaydedildi'); swRefresh();
   } catch (e) { swNotify(e.message, true); }
 }
