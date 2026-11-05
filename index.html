@@ -1093,7 +1093,7 @@ td { padding: 16px 24px; vertical-align: middle; }
       <button class="icon-btn" onclick="swRefresh()" title="Yenile">↻</button>
       <button class="icon-btn" onclick="closeStoreWatch()" title="Kapat">✕</button>
     </div>
-    <div style="font-size:12px;color:var(--text3);line-height:1.5;">Mağazaları senin Chrome'undaki asin-alici eklentisi, <b>normal mağaza taramasıyla</b> tarar: her ülke için ayrı bir sekmede mağaza sayfası açılır, eklenti paneli kategorileri tek tek gezer, bitince sekme kapanır. Buradan mağaza ekleyince ya da ▶ deyince iş oluşur; Chrome'da açık bir Amazon sekmesi varsa ~1 dk içinde başlar (açılır pencere engellenirse sol alttaki rozete tıkla), yoksa Chrome açılınca devam eder. Her gece seçilen saatte de iş oluşur. Eklentideki takip listesi de burada görünür.</div>
+    <div style="font-size:12px;color:var(--text3);line-height:1.5;">Mağazaları senin Chrome'undaki asin-alici eklentisi, <b>normal mağaza taramasıyla</b> tarar: her ülke için ayrı bir sekmede mağaza sayfası açılır, eklenti paneli kategorileri tek tek gezer, bitince sekme kapanır. Buradan mağaza ekleyince ya da ▶ deyince iş oluşur; Chrome'da açık bir Amazon sekmesi varsa birkaç saniye içinde başlar, yoksa Chrome açılınca devam eder. Her gece seçilen saatte de iş oluşur. Eklentideki takip listesi de burada görünür.</div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px;">
       <label style="font-size:11px;color:var(--text3);font-weight:700;">ÜLKE
@@ -1123,9 +1123,15 @@ td { padding: 16px 24px; vertical-align: middle; }
     </div>
     <div id="sw-status" style="font-size:12px;color:var(--text2);line-height:1.6;"></div>
 
-    <div style="overflow:auto;border:1px solid var(--border);border-radius:12px;">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;">
+      <input id="sw-q" class="cfg-input" placeholder="🔍 Mağaza adı veya Merchant ID ara" oninput="swRenderStores()" style="flex:1;min-width:180px;padding:7px 10px;">
+      <select id="sw-sort" class="cfg-input" onchange="swRenderStores()" style="width:auto;padding:6px 10px;font-family:inherit;">
+        <option value="">Sıra: eklenme</option><option value="found">En çok bekleyen</option><option value="products">En çok ürün</option><option value="recent">Son taranan</option><option value="old">En eski tarama</option><option value="name">Ada göre</option></select>
+      <span id="sw-count" style="color:var(--text3);white-space:nowrap;"></span>
+    </div>
+    <div style="overflow:auto;max-height:440px;border:1px solid var(--border);border-radius:12px;">
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead><tr style="text-align:left;background:var(--bg3);">
+        <thead style="position:sticky;top:0;z-index:1;"><tr style="text-align:left;background:var(--bg3);">
           <th style="padding:8px;">Ülke</th><th style="padding:8px;">Mağaza</th><th style="padding:8px;">Merchant ID</th><th style="padding:8px;">Kaynak</th>
           <th style="padding:8px;">Ürün</th><th style="padding:8px;">Son tarama</th><th style="padding:8px;">Bekleyen</th><th style="padding:8px;"></th>
         </tr></thead>
@@ -4857,7 +4863,7 @@ async function swRefresh() {
     const unclaimed = jb && !jb.claimedAt && Date.now() - (jb.createdAt || 0) > 30000;
     const idle = jb && !unclaimed && (!jb.heartbeatAt || Date.now() - jb.heartbeatAt > 5 * 60000);
     document.getElementById('sw-status').innerHTML = (jb ? `<b>⏳ Tarama işi: ${jb.done}/${jb.total} mağaza</b>${jb.heartbeatAt ? ` · tarayıcıdan son haber ${swAgo(jb.heartbeatAt)}` : ''}`
-        + (unclaimed ? `<br><span style="color:#d97706;">Eklenti işi henüz almadı — Chrome'da eklentili bir Amazon sekmesi açık olmalı (açıksa sayfayı bir kez yenileyin; Tampermonkey betiği 5.3 sürümünde olmalı).</span>`
+        + (unclaimed ? `<br><span style="color:#d97706;">Eklenti işi henüz almadı — Chrome'da eklentili bir Amazon sekmesi açık olmalı (açıksa sayfayı bir kez yenileyin; Tampermonkey betiği 5.4 sürümünde olmalı).</span>`
             : idle ? `<br><span style="color:#d97706;">Tarayıcıdan haber yok — takip sekmesi kapanmış olabilir; Amazon sekmesi açıksa 1 dk içinde yeniden açılır.</span>`
             : !jb.claimedAt ? `<br><span style="color:#64748b;">Chrome'daki Amazon sekmesi işi birkaç saniye içinde alır…</span>`
             : jb.current ? ` · sırada: ${swEsc(jb.current)}` : '') + '<br>' : '')
@@ -4880,10 +4886,23 @@ async function swRefresh() {
   }
 }
 
+let _swRunning = false;
 function swRenderStores(running) {
+  if (running !== undefined) _swRunning = running; else running = _swRunning;
   const tb = document.getElementById('sw-stores');
-  if (!_swStores.length) { tb.innerHTML = '<tr><td colspan="8" style="padding:12px;color:var(--text3);">Takipte mağaza yok. Yukarıdan ekleyebilirsin.</td></tr>'; return; }
-  tb.innerHTML = _swStores.map(s => {
+  const cnt = document.getElementById('sw-count');
+  if (!_swStores.length) { if (cnt) cnt.textContent = ''; tb.innerHTML = '<tr><td colspan="8" style="padding:12px;color:var(--text3);">Takipte mağaza yok. Yukarıdan ekleyebilirsin.</td></tr>'; return; }
+  const q = (document.getElementById('sw-q')?.value || '').trim().toLowerCase();
+  const sort = document.getElementById('sw-sort')?.value || '';
+  let list = q ? _swStores.filter(s => `${s.name || ''} ${s.sellerId}`.toLowerCase().includes(q)) : _swStores.slice();
+  const by = { found: s => -(s.foundSellable || 0) * 1e6 - (s.found || 0), products: s => -(s.products || 0), recent: s => -(s.scannedAt || 0),
+    old: s => s.scannedAt || 0 }[sort];
+  if (by) list.sort((a, b) => by(a) - by(b));
+  else if (sort === 'name') list.sort((a, b) => String(a.name || a.sellerId).localeCompare(String(b.name || b.sellerId), 'tr'));
+  const scanned = _swStores.filter(s => s.scannedAt).length;
+  if (cnt) cnt.textContent = `${q ? list.length + ' / ' : ''}${_swStores.length} mağaza · ${scanned} taranmış`;
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="8" style="padding:12px;color:var(--text3);">Aramayla eşleşen mağaza yok.</td></tr>'; return; }
+  tb.innerHTML = list.map(s => {
     const m = SW_MP[s.marketplaceID] || ['', s.marketplaceID, s.host];
     const url = `https://www.${m[2] || s.host}/s?me=${encodeURIComponent(s.sellerId)}&marketplaceID=${s.marketplaceID}`;
     const scanning = s.queued || (running && !s.scannedAt);
