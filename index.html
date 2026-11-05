@@ -1163,13 +1163,13 @@ td { padding: 16px 24px; vertical-align: middle; }
     <div class="cfg-label">Supabase URL</div>
     <input class="cfg-input" id="cfg-url" type="url" placeholder="https://xxxx.supabase.co" autocomplete="off" autocorrect="off" autocapitalize="off">
     <div class="cfg-label">Supabase Anon Key</div>
-    <input class="cfg-input" id="cfg-key" type="password" placeholder="eyJ..." autocomplete="off">
+    <input class="cfg-input" id="cfg-key" type="text" placeholder="eyJ... veya sb_publishable_..." autocomplete="new-password" spellcheck="false" autocorrect="off" autocapitalize="off">
     <div class="cfg-label">Marketplace ID'ler (virgülle)</div>
     <input class="cfg-input" id="cfg-mkts" type="text" placeholder="78524,87709" value="78524,87709" autocomplete="off" autocorrect="off">
     <div class="cfg-label">Sunucu URL (Komut Paneli için)</div>
     <input class="cfg-input" id="cfg-server" type="url" placeholder="https://your-app.railway.app" autocomplete="off" autocorrect="off" autocapitalize="off">
     <div class="cfg-label">Sunucu API Key (Güvenlik)</div>
-    <input class="cfg-input" id="cfg-apikey" type="password" placeholder="Railway'de API_KEY env var ile aynı değer" autocomplete="off">
+    <input class="cfg-input" id="cfg-apikey" type="password" placeholder="Railway'de API_KEY env var ile aynı değer" autocomplete="new-password">
     <div class="cfg-note">🔒 Ayarlar yalnızca bu tarayıcıda (Local Storage) saklanır.</div>
     <button id="cfg-save">Bağlan →</button>
   </div>
@@ -1519,6 +1519,12 @@ function saveConfig() {
   const serverUrl = document.getElementById('cfg-server').value.trim().replace(/\/$/, '');
   const apiKey    = document.getElementById('cfg-apikey').value.trim();
   if (!url || !key) { showToast('URL ve Key zorunludur!', 'error'); return; }
+  // Tarayıcı otomatik doldurması / karışıklık: Supabase anahtarı yerine sunucu API anahtarı girilmesin
+  if (!/^(eyJ|sb_publishable_)/.test(key) || (apiKey && key === apiKey)) {
+    showToast('Bu bir Supabase anahtarı değil — sunucu API anahtarını yanlış alana girmiş olabilirsin (eyJ… veya sb_publishable_… olmalı)', 'error');
+    document.getElementById('cfg-key').focus();
+    return;
+  }
   CFG = { url, key, mkts, serverUrl, apiKey };
   localStorage.setItem('sf_cfg', JSON.stringify(CFG));
   document.getElementById('config-overlay').style.display = 'none';
@@ -1537,12 +1543,22 @@ function openSettings() {
 document.getElementById('cfg-save').onclick = saveConfig;
 
 // ─── SUPABASE REST ────────────────────────────────────────────────────────────
+// Supabase anahtarı geçersiz (401): yüzlerce sessiz hata yerine tek uyarı + ayarları aç
+let _sbAuthWarned = false;
+function _sbAuthFailed() {
+  if (_sbAuthWarned) return;
+  _sbAuthWarned = true;
+  showToast('Supabase anahtarı geçersiz (401) — Ayarlar\'dan "Supabase Anon Key" alanını kontrol et', 'error');
+  try { openSettings(); } catch (e) {}
+}
+
 async function sbGet(key) {
   const res = await fetch(`${CFG.url}/rest/v1/sf_store?key=eq.${encodeURIComponent(key)}&select=value&limit=1`, {
     headers: { 'apikey': CFG.key, 'Authorization': `Bearer ${CFG.key}`, 'Content-Type': 'application/json' }
   });
   if (!res.ok) {
     const txt = await res.text().catch(()=>'');
+    if (res.status === 401) _sbAuthFailed();
     throw new Error(`HTTP ${res.status}: ${txt.slice(0,100)}`);
   }
   const rows = await res.json();
