@@ -1347,6 +1347,8 @@ td { padding: 16px 24px; vertical-align: middle; }
         <option value="ERROR">❌ Hata / belirsiz</option>
         <option value="PENDING">📦 Gönderilmeyi bekliyor</option>
         <option value="WAIT_TRACKING">⏳ Takip no bekleniyor</option>
+        <option value="MISSING">🔎 Cosity'de kayıt yok</option>
+        <option value="NOLABEL">🏷️ Kayıtlı, etiket yüklenmedi</option>
       </select>
       <select class="rt-select" onchange="_rtSort=this.value;renderReturnsList()">
         <option value="priority">Sıralama: Öncelik</option>
@@ -4056,8 +4058,12 @@ const RT_COS = {
   SENDING:       { label: 'Cosity\'ye gönderiliyor',   icon: '⏳', c: '#0284c7', cb: '#f0f9ff' },
   PENDING:       { label: 'Cosity\'ye gönderilecek',   icon: '📦', c: '#7c3aed', cb: '#f5f3ff' },
   WAIT_TRACKING: { label: 'Cosity: takip no bekleniyor', icon: '⏳', c: '#64748b', cb: '#f1f5f9' },
+  MISSING:       { label: 'Cosity\'de kayıt yok',       icon: '🔎', c: '#c2410c', cb: '#fff7ed' },
 };
-const RT_COS_STEP = { validate: 'Ön kontrol', login: 'Cosity girişi', asin: 'ASIN sorgusu', product: 'Ürün kaydı', deposit: 'Bakiye kontrolü', rvt: 'İade formu', save: 'İade kaydı' };
+const RT_COS_STEP = { validate: 'Ön kontrol', login: 'Cosity girişi', asin: 'ASIN sorgusu', product: 'Ürün kaydı', deposit: 'Bakiye kontrolü', rvt: 'İade formu', save: 'İade kaydı', order: 'Sipariş çekme', list: 'İade listesi' };
+const RT_COS_LIST_TR = { 'New Shipment': 'Yeni gönderi', 'Package Taken': 'Paket alındı', 'Paid': 'Ödendi', 'User Cancelled': 'İptal' };
+// Kayıtlı ama Cosity listesine göre etiket yüklenmemiş
+function rtCosNoLabel(r) { const c = r.cosity || {}; return c.status === 'DONE' && c.list && !c.list.labelAt && !c.list.notInList && (r.amzReturn || {}).status !== 'DONE'; }
 // Cosity arayüzündeki numara: RS-(iç Id + 1000). Eski kayıtlarda rsNo alanı yok → hesaplanır.
 function rtCosRs(c) { return (c && (c.rsNo || (c.returnShipmentId ? `RS-${Number(c.returnShipmentId) + 1000}` : ''))) || ''; }
 function rtCos(r) { const s = r.cosity && r.cosity.status; return (s && RT_COS[s]) ? s : null; }
@@ -4067,7 +4073,11 @@ function rtCosHtml(r) {
   const id = `'${r.mktId}','${_rtEsc(String(r.id))}'`;
   let detail = '', btn = '';
   if (s === 'DONE') {
-    detail = `<a class="rt-link" href="https://app.cosityship.com/ReturnShipment/Index?id=${encodeURIComponent(c.returnShipmentId)}&pagetype=edit" target="_blank" rel="noopener">🆔 ${_rtEsc(rtCosRs(c))}</a> <span class="rt-age">${_rtAgo(c.doneAt || c.at)}${c.manual ? ' · manuel' : ' · otomatik'}</span>`;
+    const L = c.list;
+    const src = c.source === 'list' ? ' · Cosity listesinden' : c.source === 'existing' ? ' · zaten kayıtlıydı' : c.manual ? ' · manuel' : ' · otomatik';
+    detail = `<a class="rt-link" href="https://app.cosityship.com/ReturnShipment/Index?id=${encodeURIComponent(c.returnShipmentId)}&pagetype=edit" target="_blank" rel="noopener">🆔 ${_rtEsc(rtCosRs(c))}</a> <span class="rt-age">${_rtAgo(c.doneAt || c.at)}${src}</span>`
+      + (L && !L.notInList ? ` <span class="rt-age">· ${_rtEsc(RT_COS_LIST_TR[L.statusName] || L.statusName || '')}</span>`
+        + (L.labelAt ? ` <span class="rt-age" style="color:#059669">· 🏷️ etiket yüklendi</span>` : ` <span class="rt-age" style="color:#c2410c">· ❗ etiket yüklenmedi</span>`) : '');
   } else if (s === 'ERROR' || s === 'UNKNOWN') {
     detail = `<span style="color:${m.c};font-size:12px">${_rtEsc(RT_COS_STEP[c.step] || c.step || '')}: ${_rtEsc(c.error || '')}</span> <span class="rt-age">${c.attempts || 1}. deneme · ${_rtAgo(c.at)}</span>`;
     btn = s === 'UNKNOWN'
@@ -4076,6 +4086,9 @@ function rtCosHtml(r) {
       : `<button class="rt-btn sm dark" onclick="sendReturnToCosity(${id},this,false)">🔁 Tekrar dene</button>`;
   } else if (s === 'PENDING') {
     btn = `<button class="rt-btn sm primary" onclick="sendReturnToCosity(${id},this,false)">📦 Cosity'ye Gönder</button>`;
+  } else if (s === 'MISSING') {
+    detail = `<span class="rt-age">Sistem öncesi iade — Cosity iade listesinde bu sipariş yok</span>`;
+    btn = `<button class="rt-btn sm primary" onclick="if(confirm('${_rtEsc(r.sid)} Cosity\\'ye kaydedilsin mi?'))sendReturnToCosity(${id},this,false)">📦 Cosity'ye Gönder</button>`;
   } else if (s === 'WAIT_TRACKING') {
     detail = `<span class="rt-age">${_rtEsc(c.error || 'SF\'de takip no bekleniyor')}</span>`;
   }
@@ -4106,7 +4119,9 @@ function rtAmzRetHtml(r) {
   }
   const m = RT_AMZRET[s] || RT_AMZRET.ERROR;
   let detail = '', btn = '';
-  if (s === 'DONE') {
+  if (s === 'DONE' && a.labelInCosity && !a.fileName) {
+    detail = `<span class="rt-age">Etiket Cosity'de yüklü (iade listesinden)</span>${amzLink ? ' ' + amzLink : ''}`;
+  } else if (s === 'DONE') {
     detail = `${a.rmaId ? `<span class="rt-age">RMA <b style="font-family:var(--mono)">${_rtEsc(a.rmaId)}</b></span>` : ''}
       ${a.fileName ? `<span class="rt-age">📎 ${_rtEsc(a.fileName)}</span>` : ''}
       ${a.labelUrl ? `<a class="rt-link" href="${_rtEsc(a.labelUrl)}" target="_blank" rel="noopener">🏷️ Etiket</a>` : ''}
@@ -4329,6 +4344,9 @@ function renderReturnsPanel() {
   if (metas.some(m => m.loginRequired)) warns.push('🔐 Sunucuda Amazon oturumu düşmüş — .com kontrolü yapılamıyor. Telegram\'dan login yenile.');
   for (const m of metas) if (m.sfError && (m.sfErrorAt || 0) > (m.sfSyncedAt || 0)) warns.push(`⚠️ ${_rtEsc(_rtStores[m.mktId] || m.mktId)}: SF iade listesi alınamadı (${_rtEsc(m.sfError)})`);
   const cosBad = all.filter(r => ['ERROR', 'UNKNOWN'].includes(rtCos(r))).length;
+  const cosMissing = all.filter(r => rtCos(r) === 'MISSING').length, cosNoLabel = all.filter(rtCosNoLabel).length;
+  if (cosMissing) warns.push(`🔎 ${cosMissing} Almanya iadesinin Cosity'de kaydı yok — Cosity filtresinden “🔎 Cosity'de kayıt yok” ile görüntüle.`);
+  if (cosNoLabel) warns.push(`🏷️ ${cosNoLabel} Almanya iadesi Cosity'de kayıtlı ama iade etiketi yüklenmemiş — filtreden “🏷️ Kayıtlı, etiket yüklenmedi”.`);
   if (cosBad) warns.push(`❌ ${cosBad} Almanya iadesi Cosity'ye kaydedilemedi — Cosity filtresinden “❌ Hata / belirsiz” seçerek görüntüle.`);
   document.getElementById('rt-banner').innerHTML = warns.map(w => `<div class="rt-banner">${w}</div>`).join('');
 
@@ -4394,6 +4412,7 @@ function rtFiltered() {
   else if (_rtAmz === 'REFUNDING') list = list.filter(r => rtVerdict(r).key === 'RETURN_STARTED' && rtAmzStageKey(r) === 'REFUND_ISSUED');
   else if (_rtAmz !== 'all') list = list.filter(r => rtVerdict(r).key === 'RETURN_STARTED' && rtAmzStageKey(r) === _rtAmz);
   if (_rtCos === 'ERROR') list = list.filter(r => ['ERROR', 'UNKNOWN'].includes(rtCos(r)));
+  else if (_rtCos === 'NOLABEL') list = list.filter(rtCosNoLabel);
   else if (_rtCos !== 'all') list = list.filter(r => rtCos(r) === _rtCos);
   const q = _rtSearch.trim().toLowerCase();
   if (q) list = list.filter(r => [r.sid, r.buyerOrderId, r.asin, r.trackingNumber, r.rmaNumber, r.amazon?.rmaId, r.carrier, _rtStores[r.mktId], rtCosRs(r.cosity)]
