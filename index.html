@@ -2278,8 +2278,13 @@ function openModal(order) {
       </div>
       ${order.amazonTrackingId ? `
       <div class="detail-item">
-        <div class="detail-key">Amazon Takip</div>
+        <div class="detail-key">Amazon Takip${order.amazonCarrier ? ` · ${order.amazonCarrier}` : ''}</div>
         <div class="detail-val" style="font-family:var(--mono);font-size:14px"><a href="https://parcelsapp.com/en/tracking/${order.amazonTrackingId}" target="_blank" style="color:var(--seller-blue);text-decoration:none">${order.amazonTrackingId}</a></div>
+      </div>` : ''}
+      ${order.amazonDeliveredAt ? `
+      <div class="detail-item">
+        <div class="detail-key">Depoya Teslim (Amazon)</div>
+        <div class="detail-val" style="font-size:14px">${new Date(order.amazonDeliveredAt).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
       </div>` : ''}
       ${order.whName ? `
       <div class="detail-item">

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SellerFlash Panel (Sunucu Modu)
 // @namespace    http://tampermonkey.net/
-// @version      2.0.2
+// @version      2.0.3
 // @description  Hafif panel — tüm otomasyon sunucuda çalışır. Bu eklenti sadece UI gösterir. SF token manuel olarak Supabase'e girilmeli.
 // @author       Kerem Yeniçay & AI
 // @downloadURL  https://raw.githubusercontent.com/keremyenicay/sfadminlog/main/userscripts/sellerflash-panel.user.js
@@ -443,7 +443,7 @@
                 const sc = TABLE_SEARCH;
                 const chk = (val, q) => !q || String(val||'').toLowerCase().includes(q);
                 return chk(id, sc.sfId) && chk(d.asin, sc.asin) && chk(d.buyerOrderId, sc.buyerId)
-                    && chk(d.status, sc.status) && chk(d.amazonTrackingId, sc.amzTrack)
+                    && chk(d.status, sc.status) && chk(`${d.amazonCarrier||''} ${d.amazonTrackingId||''}`, sc.amzTrack)
                     && chk(d.warehouse, sc.warehouse)
                     && chk(d.warehouseId, sc.depoNo) && chk(d.shipmentId, sc.shipId)
                     && chk(d.whTracking, sc.tracking) && chk(d.cargoCompany, sc.cargo)
@@ -531,8 +531,15 @@
         else if (d.deliveryOverdue)                       amzHtml = `<span class="bd bd-r">⏰ Gecikti</span>`;
         else if (d.isSellerRefunded)                      amzHtml = `<span class="bd bd-r">💸 Müşt.İade</span>`;
         else if (d.isBuyerRefunded)                       amzHtml = `<span class="bd bd-o">💰 AMZ İade</span>`;
-        else if (d.status === 'Delivered')                amzHtml = `<span class="bd bd-b">Delivered</span>`;
-        else if (d.status?.includes('Shipped'))           amzHtml = `<span class="bd bd-g">Shipped</span>`;
+        else if (d.status === 'Delivered') {
+            const dt = d.amazonDeliveredAt || d.deliveredToWarehouseAt;
+            const dtTxt = dt ? new Date(dt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) : '';
+            amzHtml = `<span class="bd bd-b" title="${(d.amazonStatusText || 'Depoya teslim edildi').replace(/"/g, '&quot;')}">✓ Delivered${dtTxt ? ' · ' + dtTxt : ''}</span>`;
+        }
+        else if (d.status?.includes('Shipped'))           amzHtml = `<span class="bd bd-g">🚚 Shipped</span>`;
+        else if (d.status === 'Arriving')                 amzHtml = `<span class="bd bd-g" title="${(d.amazonStatusText || '').replace(/"/g, '&quot;')}">📦 ${d.amazonStatusText && d.amazonStatusText.length < 40 ? d.amazonStatusText : 'Arriving'}</span>`;
+        else if (/In Transit/.test(d.status || ''))       amzHtml = `<span class="bd bd-g">🚚 ${d.status}</span>`;
+        else if (d.status === 'Delayed')                  amzHtml = `<span class="bd bd-o">⏰ Delayed</span>`;
         else if (['Not Shipped','Preparing','Ordered'].includes(d.status)) amzHtml = `<span class="bd bd-o">${d.status}</span>`;
         else if (d.status?.includes('Diğer'))             amzHtml = `<span class="bd bd-p">${d.status}</span>`;
         else if (/Hata|Link|Login|Cancel|Sıraya/i.test(d.status||'')) amzHtml = `<span class="bd bd-r">${d.status}</span>`;
@@ -575,7 +582,7 @@
         // Depoda kaç gün
         let daysHtml = '<span style="color:#94a3b8;">—</span>';
         if (!d.isShipped && !d.sfDelivered && !d.whTrackStatus?.includes('Teslim') && d.status === 'Delivered') {
-            const ts = d.deliveredToWarehouseAt || d.lastCheck || 0;
+            const ts = d.amazonDeliveredAt || d.deliveredToWarehouseAt || d.lastCheck || 0;
             if (ts) {
                 const days = Math.floor((Date.now() - ts) / 86400000);
                 daysHtml = `<span class="bd ${days>=7?'bd-r':days>=3?'bd-o':'bd-b'}">${days===0?'Bugün':days+' gün'}</span>`;
@@ -596,9 +603,18 @@
             ? `<a href="https://www.amazon.com.au/dp/${d.asin}" target="_blank" style="font-family:monospace;font-size:11px;color:#0369a1;text-decoration:none;" title="Amazon'da aç">${d.asin}</a>`
             : '<span style="color:#94a3b8;">—</span>';
 
-        // Amazon takip no (buyerOrder'ın Amazon→depo takibi, TBA…)
+        // Amazon takip no (buyerOrder'ın Amazon→depo takibi: USPS, UPS, TBA…) + kargo firması
+        const amzCarrier = d.amazonCarrier || '';
+        const amzTrackUrl = (() => {
+            const t = encodeURIComponent(d.amazonTrackingId || ''), c = amzCarrier.toLowerCase();
+            if (c.includes('usps'))  return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${t}`;
+            if (c.includes('ups'))   return `https://www.ups.com/track?tracknum=${t}`;
+            if (c.includes('fedex')) return `https://www.fedex.com/fedextrack/?trknbr=${t}`;
+            if (c.includes('dhl'))   return `https://www.dhl.com/tr-en/home/tracking.html?tracking-id=${t}&submit=1`;
+            return `https://parcelsapp.com/en/tracking/${t}`;
+        })();
         const amzTrackHtml = d.amazonTrackingId
-            ? `<a href="https://parcelsapp.com/en/tracking/${d.amazonTrackingId}" target="_blank" style="font-family:monospace;font-size:11px;color:#c2410c;text-decoration:none;">${d.amazonTrackingId}</a>
+            ? `${amzCarrier ? `<span class="bd bd-gy" style="margin-right:4px;">${amzCarrier}</span>` : ''}<a href="${amzTrackUrl}" target="_blank" style="font-family:monospace;font-size:11px;color:#c2410c;text-decoration:none;">${d.amazonTrackingId}</a>
                <button class="sf-copy-btn" onclick="navigator.clipboard.writeText('${d.amazonTrackingId}');this.textContent='✓';setTimeout(()=>this.textContent='Kopyala',1200)">Kopyala</button>`
             : '<span style="color:#94a3b8;">—</span>';
 
@@ -633,9 +649,10 @@
     // EXCEL EXPORT
     // ─────────────────────────────────────────────
     function exportToExcel() {
-        const headers = ['SF Sipariş No','ASIN','Buyer Sipariş No','Amazon Durum','Amazon Takip','Depo','Depo No','Shipment ID','Takip No','Kargo','Depo Durumu','Teslimat Durumu','Çıkış Tarihi'];
+        const headers = ['SF Sipariş No','ASIN','Buyer Sipariş No','Amazon Durum','Amazon Takip','Amazon Kargo','Amazon Teslim','Depo','Depo No','Shipment ID','Takip No','Kargo','Depo Durumu','Teslimat Durumu','Çıkış Tarihi'];
         const rows = VS.data.map(([id, d]) => [
-            id, d.asin||'', d.buyerOrderId||'', d.status||'', d.amazonTrackingId||'', d.warehouse||'', d.warehouseId||'',
+            id, d.asin||'', d.buyerOrderId||'', d.status||'', d.amazonTrackingId||'', d.amazonCarrier||'',
+            (d.amazonDeliveredAt ? new Date(d.amazonDeliveredAt).toLocaleString('tr-TR') : ''), d.warehouse||'', d.warehouseId||'',
             d.shipmentId||'', d.whTracking||'', d.cargoCompany||'',
             d.whStatus||'', d.whTrackStatus||'', d.exitDate||''
         ]);
