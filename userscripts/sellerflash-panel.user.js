@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SellerFlash Panel (Sunucu Modu)
 // @namespace    http://tampermonkey.net/
-// @version      2.0.3
+// @version      2.0.4
 // @description  Hafif panel — tüm otomasyon sunucuda çalışır. Bu eklenti sadece UI gösterir. SF token manuel olarak Supabase'e girilmeli.
 // @author       Kerem Yeniçay & AI
 // @downloadURL  https://raw.githubusercontent.com/keremyenicay/sfadminlog/main/userscripts/sellerflash-panel.user.js
@@ -327,12 +327,18 @@
     // ─────────────────────────────────────────────
     // SİPARİŞ DURUMU YARDIMCILARI
     // ─────────────────────────────────────────────
+    // Kargo olay metni teslim mi? (sunucudaki carriers.isDeliveredText ile aynı kural)
+    // "Delivery - Proof of delivery" teslim; "Out for delivery" / "Delivery attempted" değil.
+    const DELIVERED_RE = /\bdelivered\b|proof of delivery|delivery (?:successful|success|completed|complete)|teslim edildi|zugestellt|livr[ée]|consegnat[oa]|entregad[oa]|bezorgd/i;
+    const NOT_DELIVERED_RE = /out for delivery|attempt|failed|unable|exception|not delivered|undeliver|scheduled|delayed|could not|wird zugestellt|en cours de livraison/i;
+    const isDeliveredText = t => DELIVERED_RE.test(t || '') && !NOT_DELIVERED_RE.test(t || '');
+
     const OrderState = {
         // Teslim: sfDelivered VEYA whTrackStatus teslim içeriyor VEYA Amazon Delivered + kargo var
         isDelivered: o => {
             if (o.sfDelivered) return true;
             if (o.whTrackStatus?.toLowerCase().includes('teslim')) return true;
-            if (o.whTrackStatus?.toLowerCase().includes('delivered') && o.whTracking) return true;
+            if (o.whTracking && isDeliveredText(o.whTrackStatus)) return true;
             return false;
         },
         // Kargoda: depodan çıkmış (isShipped=true) VE teslim edilmemiş
