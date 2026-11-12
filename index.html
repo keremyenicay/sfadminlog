@@ -1509,6 +1509,7 @@ let _isRefreshing = false;
 let _pendingOps   = new Set();
 let _amazonQueue  = []; // Queue'daki işler (sıra numarası gösterimi için)
 let _activeAmazonJob = null; // Şu an işlenen Amazon işi
+let _amazonSkipSid = null;   // Atlama isteği gönderilmiş sipariş (sunucu işleyene kadar)
 
 function loadConfig() {
   const saved = localStorage.getItem('sf_cfg');
@@ -1784,6 +1785,7 @@ async function fetchAllData(dirty = null) {
     }
   } catch(e) {}
   _activeAmazonJob = azStatus;
+  if (_amazonSkipSid && !(azStatus && azStatus.sid === _amazonSkipSid && ['PENDING', 'IN_PROGRESS'].includes(azStatus.status))) _amazonSkipSid = null;
 
   // ─── Queue'yu da çek ───────────────────────────────────────────────────────
   try {
@@ -2166,7 +2168,8 @@ function buildActions(order, state) {
     const qIdx = _amazonQueue ? _amazonQueue.findIndex(j => j.sid === sid) : -1;
 
     if (isActive) {
-      html += `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,123,0,0.12);border:1px solid rgba(255,123,0,0.3);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--sf-orange);font-family:var(--mono)">⚙️ İşleniyor</span>`;
+      html += `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,123,0,0.12);border:1px solid rgba(255,123,0,0.3);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--sf-orange);font-family:var(--mono)">${_amazonSkipSid === sid ? '⏭️ Atlanıyor…' : '⚙️ İşleniyor'}</span>`;
+      html += `<button class="act-btn btn-cancel" onclick="doSkipAmazon(event,'${sid}','${mktId}')" title="Bu siparişte sorun varsa durdur ve sıradakine geç" style="font-size:11px">⏭️ Atla</button>`;
     } else if (qIdx >= 0) {
       html += `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,123,0,0.12);border:1px solid rgba(255,123,0,0.3);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--sf-orange);font-family:var(--mono)">🕒 Sıra #${qIdx + 1}</span>`;
       html += `<button class="act-btn btn-cancel" onclick="doCancelQueue('${sid}','${mktId}')" style="font-size:11px">✕</button>`;
@@ -2362,7 +2365,8 @@ function openModal(order) {
               (_activeAmazonJob.status === 'PENDING' || _activeAmazonJob.status === 'IN_PROGRESS');
           const qIdx = _amazonQueue ? _amazonQueue.findIndex(j => j.sid === order.sid) : -1;
           if (isActive) {
-            return `<div style="padding:12px 16px;background:rgba(255,123,0,0.1);border:1px solid rgba(255,123,0,0.25);border-radius:12px;text-align:center;font-weight:700;color:var(--sf-orange)">⚙️ Amazon Siparişi İşleniyor...</div>`;
+            return `<div style="padding:12px 16px;background:rgba(255,123,0,0.1);border:1px solid rgba(255,123,0,0.25);border-radius:12px;text-align:center;font-weight:700;color:var(--sf-orange)">${_amazonSkipSid === order.sid ? '⏭️ Atlanıyor — sıradaki siparişe geçiliyor…' : '⚙️ Amazon Siparişi İşleniyor...'}</div>
+                    <button class="act-btn btn-cancel" onclick="doSkipAmazon(event,'${order.sid}','${order.mktId}')">⏭️ Bu Siparişi Atla</button>`;
           }
           if (qIdx >= 0) {
             return `<div style="padding:12px 16px;background:rgba(255,123,0,0.1);border:1px solid rgba(255,123,0,0.25);border-radius:12px;text-align:center;font-weight:700;color:var(--sf-orange)">🕒 Sıra #${qIdx + 1} — Bekleniyor</div>
@@ -2521,6 +2525,19 @@ async function doCancelQueue(sid, mktId) {
     showToast(`✅ ${sid} sıradan çıkarıldı`, 'success');
     await refreshAll();
   } catch(e) { showToast('Hata: ' + e.message, 'error'); }
+}
+
+// ⏭️ Bu siparişi atla: sunucu çalışan .com siparişini durdurur, sıradaki siparişe geçer.
+// Place Order'a basılmışsa sunucu atlamaz (sipariş verilmiş olabilir) ve Telegram'a bildirir.
+async function doSkipAmazon(event, sid, mktId) {
+  if (!confirm(`${sid} için .com siparişi durdurulsun ve sıradaki siparişe geçilsin mi?\n\nSipariş panelde kalır; sorunu giderip tekrar "Amazon'a Geç" ile başlatabilirsin.`)) return;
+  try {
+    await sbPut('AMAZON_AUTO_ORDER_SKIP', JSON.stringify({ sid, mktId, at: Date.now() }));
+    _amazonSkipSid = sid;
+    showToast('⏭️ Atlama isteği gönderildi — birkaç saniye içinde sıradaki siparişe geçilecek', 'success');
+    renderOrders(); refreshModalIfOpen();
+    setTimeout(refreshAll, 6000);
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
 }
 
 async function doCancelAmazon(event, sid, mktId) {
