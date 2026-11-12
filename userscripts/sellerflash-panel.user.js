@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SellerFlash Panel (Sunucu Modu)
 // @namespace    http://tampermonkey.net/
-// @version      2.0.5
+// @version      2.0.6
 // @description  Hafif panel — tüm otomasyon sunucuda çalışır. Bu eklenti sadece UI gösterir. SF token manuel olarak Supabase'e girilmeli.
 // @author       Kerem Yeniçay & AI
 // @downloadURL  https://raw.githubusercontent.com/keremyenicay/sfadminlog/main/userscripts/sellerflash-panel.user.js
@@ -369,6 +369,12 @@
             return Math.floor((Date.now() - o.whTrackStatusAt) / 86400000);
         },
         isStale:         o => (OrderState.staleDays(o) ?? -1) >= 3,
+        // Rozette görünen metin (filtre de aynı metinde arar)
+        staleText:       o => {
+            const sd = OrderState.staleDays(o);
+            if (sd === null) return '';
+            return sd === 0 ? 'bugün güncellendi' : `${o.whTrackStatusAtApprox ? '≥' : ''}${sd} gündür aynı`;
+        },
         isOtherAcc:      o => !!(o.status?.includes('Diğer Hesapta') || o.status?.includes('Hesapta 🔄')),
         isSellerRefunded:o => o.isSellerRefunded === true,
         isBuyerRefunded: o => o.isBuyerRefunded  === true,
@@ -453,6 +459,20 @@
             });
         }
 
+        // Teslimat filtresi: "4 gün" / "4 gündür aynı" / "≥4" → bekleme günü tam 4; "3+" → 3 ve üzeri;
+        // diğer metinler kargo durumu + rozet metninde aranır ("aynı", "bugün", "Shipment Information"…)
+        function deliveryMatch(d, q) {
+            if (!q) return true;
+            // "3", "3 gün", "3 gündür aynı", "3+" → 3 gün ve üzeri; "=3" → tam 3 gün
+            const m = q.match(/^\s*(=)?\s*[≥>]?\s*(\d+)\s*(?:\+|g(?:ü|u)n|gündür|gundur|$|\s)/i);
+            if (m) {
+                const sd = OrderState.staleDays(d);
+                if (sd === null) return false;
+                return m[1] ? sd === +m[2] : sd >= +m[2];
+            }
+            return `${d.whTrackStatus || ''} ${OrderState.staleText(d)}`.toLowerCase().includes(q);
+        }
+
         const hasSearch = Object.values(TABLE_SEARCH).some(v => v.length > 0);
         if (hasSearch) {
             list = list.filter(([id, d]) => {
@@ -463,7 +483,7 @@
                     && chk(d.warehouse, sc.warehouse)
                     && chk(d.warehouseId, sc.depoNo) && chk(d.shipmentId, sc.shipId)
                     && chk(d.whTracking, sc.tracking) && chk(d.cargoCompany, sc.cargo)
-                    && chk(d.whStatus, sc.whStatus) && chk(d.whTrackStatus, sc.delivery);
+                    && chk(d.whStatus, sc.whStatus) && deliveryMatch(d, sc.delivery);
             });
         }
 
@@ -611,7 +631,7 @@
         if (sd !== null) {
             const since = new Date(d.whTrackStatusAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
             const cls = sd >= 5 ? 'bd-r' : sd >= 3 ? 'bd-o' : 'bd-gy';
-            const txt = sd === 0 ? 'bugün güncellendi' : `${d.whTrackStatusAtApprox ? '≥' : ''}${sd} gündür aynı`;
+            const txt = OrderState.staleText(d);
             staleHtml = ` <span class="bd ${cls}" style="margin-left:4px;" title="Kargo durumu ${since} tarihinden beri değişmedi${d.whTrackStatusAtApprox ? ' (en az — kayıt bu tarihte başladı)' : ''}">⏳ ${txt}</span>`;
         }
 
@@ -863,7 +883,7 @@
                     <th><input class="sf-flt" data-col="tracking"  placeholder="Takip…"    /></th>
                     <th><input class="sf-flt" data-col="cargo"     placeholder="Kargo…"    /></th>
                     <th><input class="sf-flt" data-col="whStatus"  placeholder="Depo Dur…" /></th>
-                    <th><input class="sf-flt" data-col="delivery"  placeholder="Teslimat…" /></th>
+                    <th><input class="sf-flt" data-col="delivery"  placeholder="Teslimat / 3 gün / =3" title="Kargo durumu metni ya da bekleme süresi: '3 gün' = 3 gün ve üzeri aynı kalanlar, '=3' = tam 3 gün" /></th>
                     <th></th><th></th><th></th>
                 </tr>
                 </thead>
