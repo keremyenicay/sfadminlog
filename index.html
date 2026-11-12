@@ -1304,6 +1304,7 @@ td { padding: 16px 24px; vertical-align: middle; }
              oninput="setMsgSearch(this.value)"
              style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:var(--bg1);color:var(--text);">
     </div>
+    <div id="dl-wrap" style="margin-bottom:14px;"></div>
     <div id="msg-list"></div>
     <div id="msg-empty" style="display:none;text-align:center;padding:40px 16px;color:var(--text3);font-size:14px;">Bekleyen mesaj yok. "Mesajları Tara" ile kontrol et.</div>
   </div>
@@ -3154,6 +3155,11 @@ async function loadMsgQueues() {
       const q = await sbGet(`MSG_${mktId}`);
       _msgQueues[mktId] = (q && typeof q === 'object') ? q : {};
     } catch (e) { _msgQueues[mktId] = {}; }
+    try {
+      const d = await sbGet(`DELAY_MSG_${mktId}`);
+      _delayRecs[mktId] = (d && typeof d === 'object') ? d : {};
+    } catch (e) { _delayRecs[mktId] = {}; }
+    if (!_dlStoreNames[mktId]) _dlStoreNames[mktId] = await fetchStoreName(mktId).catch(() => `Mağaza ${mktId}`);
   }
   refreshMsgBadge();
 }
@@ -3165,7 +3171,7 @@ function _pendingCount() {
       if ((_msgQueues[mktId][id].status || 'pending') === 'pending') n++;
     }
   }
-  return n;
+  return n + _dlPendingCount();
 }
 
 function refreshMsgBadge() {
@@ -3225,6 +3231,7 @@ function _analysisBox(r) {
 }
 
 function renderMsgPanel() {
+  renderDelayPanel();
   const list = document.getElementById('msg-list');
   const empty = document.getElementById('msg-empty');
   // Filtre çubuğu + SLA özeti
@@ -3265,6 +3272,7 @@ function renderMsgPanel() {
     const ap = (a.status || 'pending') === 'pending' ? 0 : 1;
     const bp = (b.status || 'pending') === 'pending' ? 0 : 1;
     if (ap !== bp) return ap - bp;
+    if (ap === 0 && !!a.delayNotice !== !!b.delayNotice) return a.delayNotice ? -1 : 1;   // gecikme bildirimine cevaplar önce
     if (ap === 0) return new Date(a.listDate || 0) - new Date(b.listDate || 0);
     return (b.createdAt || 0) - (a.createdAt || 0);
   });
@@ -3307,7 +3315,7 @@ function renderMsgPanel() {
             <div style="font-size:12px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62vw;">${_msgEsc(snippet)}</div>
           </div>
         </div>
-        <div style="text-align:right;flex-shrink:0;">${statusBadge}${_ageBadge(r) ? '<div style="margin-top:3px;">'+_ageBadge(r)+'</div>' : ''}</div>
+        <div style="text-align:right;flex-shrink:0;">${r.delayNotice ? `<div style="margin-bottom:3px;"><span title="Bu siparişe ${_msgEsc(new Date(r.delayNotice.sentAt).toLocaleDateString('tr-TR'))} tarihinde gecikme bildirimi gönderildi" style="font-size:11px;font-weight:700;color:#b45309;background:#fff4e0;border:1px solid #f5d9a8;padding:2px 7px;border-radius:6px;">⏳ Gecikme bildirimine cevap</span></div>` : ''}${statusBadge}${_ageBadge(r) ? '<div style="margin-top:3px;">'+_ageBadge(r)+'</div>' : ''}</div>
       </div>
 
       <div id="msg-body-${r.mktId}-${r.id}" style="display:${open ? 'block' : 'none'};padding:0 14px 14px;">
@@ -3635,6 +3643,167 @@ async function ignoreMsg(mktId, id, btn) {
   } catch (e) { showCmdResult(`Bağlantı hatası: ${e.message}`, false); }
   if (btn) btn.classList.remove('loading');
   refreshMsgBadge(); renderMsgPanel();
+}
+
+// ─── GECİKME BİLDİRİMLERİ (sunucu: delay-msg.js, Supabase: DELAY_MSG_<mkt>) ─────
+// Kargo durumu X gündür değişmeyen siparişler için bilgilendirme taslağı; gecikme mesajı
+// gönderilmiş sipariş teslim olunca "teslim edildi" taslağı. Gönderim YALNIZ onayla.
+let _delayRecs = {};          // mktId -> { orderId: rec }
+let _dlStoreNames = {};
+let _dlTab  = 'delay';        // delay | delivered | sent
+let _dlOpen = null;           // null: bekleyen varsa açık
+const _dlOpenIds = new Set();
+const DL_SYM = { EUR: '€', GBP: '£', AUD: 'A$', USD: '$' };
+
+function _dlPendingCount(kind) {
+  let n = 0;
+  for (const recs of Object.values(_delayRecs)) for (const r of Object.values(recs || {})) {
+    if ((!kind || kind === 'delay') && r.delay?.status === 'pending') n++;
+    if ((!kind || kind === 'delivered') && r.delivered?.status === 'pending') n++;
+  }
+  return n;
+}
+function _dlKey(mktId, id) { return String(mktId) + '-' + String(id).replace(/[^A-Za-z0-9_-]/g, '_'); }
+function _dlRows() {
+  const rows = [];
+  for (const [mktId, recs] of Object.entries(_delayRecs)) for (const [id, r] of Object.entries(recs || {})) {
+    if (_dlTab === 'sent') {
+      for (const kind of ['delay', 'delivered']) if (r[kind]?.status === 'sent') rows.push({ mktId, id, r, kind, at: r[kind].sentAt || 0 });
+    } else if (r[_dlTab]?.status === 'pending') rows.push({ mktId, id, r, kind: _dlTab });
+  }
+  if (_dlTab === 'sent') rows.sort((a, b) => b.at - a.at);
+  else if (_dlTab === 'delay') rows.sort((a, b) => (b.r.score || 0) - (a.r.score || 0));
+  else rows.sort((a, b) => (b.r.updatedAt || 0) - (a.r.updatedAt || 0));
+  return rows.slice(0, 80);
+}
+function setDlTab(t) { _dlTab = t; _dlOpen = true; renderDelayPanel(); }
+function toggleDlPanel() { _dlOpen = !(_dlOpen ?? _dlPendingCount() > 0); renderDelayPanel(); }
+function toggleDlCard(k) { _dlOpenIds.has(k) ? _dlOpenIds.delete(k) : _dlOpenIds.add(k); renderDelayPanel(); }
+
+function renderDelayPanel() {
+  const wrap = document.getElementById('dl-wrap');
+  if (!wrap) return;
+  const nDelay = _dlPendingCount('delay'), nDel = _dlPendingCount('delivered');
+  const open = _dlOpen ?? (nDelay + nDel > 0);
+  const tab = (k, label, n) => `<button class="profit-period-btn ${_dlTab === k ? 'active' : ''}" onclick="setDlTab('${k}')">${label}${n != null ? ` (${n})` : ''}</button>`;
+  const rows = open ? _dlRows() : [];
+  const body = !open ? '' : `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0 8px;">
+      ${tab('delay', '⏳ Gecikme', nDelay)}${tab('delivered', '📦 Teslim edildi', nDel)}${tab('sent', '✅ Gönderilenler')}
+      <button class="cmd-btn" style="margin-left:auto;background:var(--bg2);color:var(--text2);" onclick="scanDelayMsgs(this)">🔄 Şimdi tara</button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">Amazon kuralları: link, e-posta, telefon, iptal önerisi, değerlendirme isteği, indirim ve depo/başka site bilgisi yazılamaz — sunucu bu içerikleri reddeder. Sipariş başına 1 gecikme + 1 teslim mesajı.</div>
+    ${rows.length ? rows.map(_dlCard).join('') : `<div style="text-align:center;color:var(--text3);font-size:13px;padding:14px 0;">${_dlTab === 'sent' ? 'Henüz gönderilen bildirim yok.' : 'Onay bekleyen bildirim yok.'}</div>`}`;
+  wrap.innerHTML = `
+    <div style="background:#fffaf2;border:1px solid #f3dfbf;border-radius:14px;padding:10px 14px;">
+      <div onclick="toggleDlPanel()" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <span style="font-size:12px;color:var(--text3);">${open ? '▼' : '▶'}</span>
+        <b style="font-size:14px;color:var(--text);">⏳ Gecikme Bildirimleri</b>
+        ${nDelay + nDel ? `<span style="background:#f59e0b;color:#fff;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;">${nDelay + nDel} onay bekliyor</span>` : `<span style="font-size:12px;color:var(--text3);">bekleyen yok</span>`}
+      </div>
+      ${body}
+    </div>`;
+}
+
+function _dlCard({ mktId, id, r, kind }) {
+  const sub = r[kind] || {};
+  const k = _dlKey(mktId, id) + '-' + kind;
+  const isOpen = _dlOpenIds.has(k);
+  const sent = sub.status === 'sent';
+  const price = r.price != null ? `${DL_SYM[r.currency] || ''}${Number(r.price).toFixed(2)}${DL_SYM[r.currency] ? '' : ' ' + _msgEsc(r.currency || '')}` : 'tutar ?';
+  const sinceTxt = r.statusSince ? new Date(r.statusSince).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) : '';
+  const risk = (r.score || 0) >= 300 ? '#dc2626' : (r.score || 0) >= 120 ? '#d97706' : '#64748b';
+  const head = kind === 'delay'
+    ? `<span style="font-weight:700;color:${risk};">${r.statusSinceApprox ? '≥' : ''}${r.staleDays ?? '?'} gün hareketsiz</span> · ${price}`
+    : `<span style="font-weight:700;color:#16a34a;">📦 Teslim edildi</span> · ${price}`;
+  const issues = (sub.issues || []).length ? `<div style="font-size:11px;color:#b45309;background:#fff8e6;border:1px solid #f0e0b0;border-radius:8px;padding:6px 8px;margin-top:6px;">⚠️ Kural uyarısı: ${_msgEsc(sub.issues.join(' · '))} — metni düzelt.</div>` : '';
+  const details = !isOpen ? '' : `
+    <div style="padding:0 0 4px;">
+      <div style="font-size:12px;color:var(--text2);margin:6px 0;line-height:1.6;">
+        ${r.cargoStatus ? `🚚 <b>Son durum:</b> ${_msgEsc(r.cargoStatus)}${sinceTxt ? ` <span style="color:var(--text3);">(${sinceTxt} tarihinden beri)</span>` : ''}<br>` : ''}
+        ${r.whTracking ? `🔢 ${_msgEsc(r.cargoCompany || '')} <span style="font-family:monospace;">${_msgEsc(r.whTracking)}</span><br>` : ''}
+        👤 ${_msgEsc(r.customerName || '—')} ${r.countryCode ? '· ' + _msgEsc(r.countryCode) : ''} · dil: <b>${_msgEsc(r.language || 'en')}</b> ${kind === 'delay' ? `· risk puanı ${_msgEsc(r.score ?? '—')}` : ''}
+      </div>
+      ${sent ? `
+        <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">GÖNDERİLEN (${_msgEsc(r.language || '')}) · ${new Date(sub.sentAt).toLocaleString('tr-TR')}</div>
+        <div style="background:var(--bg2);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text2);white-space:pre-wrap;border:1px solid var(--border);">${_msgEsc(sub.sentText || '')}</div>
+        ${sub.sentTr ? `<div style="font-size:11px;color:var(--text3);margin-top:4px;white-space:pre-wrap;">🇹🇷 ${_msgEsc(sub.sentTr)}</div>` : ''}` : `
+        <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:4px;">✍️ TÜRKÇE METİN (gönderilirken ${_msgEsc(r.language || 'en')} diline çevrilir)</div>
+        <textarea id="dl-ta-${k}" oninput="document.getElementById('dl-pv-${k}').dataset.stale='1';document.getElementById('dl-pv-${k}').style.opacity='.5'" style="width:100%;min-height:150px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;background:#fff;">${_msgEsc(sub.draftTr || '')}</textarea>
+        <div style="font-size:11px;color:var(--text3);font-weight:700;margin:6px 0 4px;">👁 MÜŞTERİYE GİDECEK HALİ</div>
+        <div id="dl-pv-${k}" style="font-size:12px;color:var(--text2);white-space:pre-wrap;background:#f3fbf4;border:1px solid #c7e9cc;border-radius:8px;padding:8px 10px;">${_msgEsc(sub.draft || 'Önizle butonuna basınca çeviriyi gösterir.')}</div>
+        ${issues}
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <button class="cmd-btn" style="background:var(--bg2);color:var(--text2);" onclick="previewDelayMsg('${mktId}','${_msgEsc(id)}','${kind}','${k}',this)">👁 Önizle</button>
+          <button class="cmd-btn" style="background:#16a34a;color:#fff;" onclick="sendDelayMsg('${mktId}','${_msgEsc(id)}','${kind}','${k}',this)">📨 Onayla ve Gönder</button>
+          <button class="cmd-btn" style="background:var(--bg2);color:var(--text3);" onclick="ignoreDelayMsg('${mktId}','${_msgEsc(id)}','${kind}',this)">Gönderme</button>
+        </div>`}
+    </div>`;
+  return `
+    <div style="background:#fff;border:1px solid var(--border);border-radius:12px;margin-top:8px;padding:10px 12px;">
+      <div onclick="toggleDlCard('${k}')" style="display:flex;justify-content:space-between;gap:8px;cursor:pointer;">
+        <div style="min-width:0;">
+          <div style="font-size:13px;font-weight:700;color:var(--text);font-family:monospace;">${isOpen ? '▼' : '▶'} ${_msgEsc(id)}</div>
+          <div style="font-size:11px;color:var(--text3);">${_msgEsc(_dlStoreNames[mktId] || mktId)}${r.cargoCompany ? ' · ' + _msgEsc(r.cargoCompany) : ''}</div>
+        </div>
+        <div style="text-align:right;font-size:12px;flex-shrink:0;">${sent ? `<span style="color:#16a34a;font-weight:700;">✅ ${kind === 'delay' ? 'Gecikme' : 'Teslim'} · ${new Date(sub.sentAt).toLocaleDateString('tr-TR')}</span>` : head}</div>
+      </div>
+      ${details}
+    </div>`;
+}
+
+async function _dlPost(path, payload) {
+  const res = await fetch(`${getServerUrl()}/delay-msg/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  let data = {}; try { data = await res.json(); } catch (_) {}
+  return data;
+}
+async function previewDelayMsg(mktId, orderId, kind, k, btn) {
+  const text = (document.getElementById(`dl-ta-${k}`)?.value || '').trim();
+  if (!text) return showCmdResult('Metin boş olamaz', false);
+  btn?.classList.add('loading');
+  try {
+    const d = await _dlPost('preview', { mktId, orderId, kind, text });
+    const pv = document.getElementById(`dl-pv-${k}`);
+    if (pv) { pv.textContent = d.text || '(çeviri alınamadı)'; pv.style.opacity = '1'; delete pv.dataset.stale; }
+    if (d.issues?.length) showCmdResult(`Kural uyarısı: ${d.issues.join(', ')}`, false);
+  } catch (e) { showCmdResult(`Bağlantı hatası: ${e.message}`, false); }
+  btn?.classList.remove('loading');
+}
+async function sendDelayMsg(mktId, orderId, kind, k, btn) {
+  const text = (document.getElementById(`dl-ta-${k}`)?.value || '').trim();
+  if (!text) return showCmdResult('Metin boş olamaz', false);
+  const r = _delayRecs[mktId]?.[orderId];
+  if (!confirm(`${orderId} siparişinin müşterisine ${kind === 'delay' ? 'GECİKME' : 'TESLİM'} bildirimi gönderilecek (${r?.language || 'en'} diline çevrilerek). Bu sipariş için bu tür mesaj bir daha gönderilemez. Onaylıyor musun?`)) return;
+  btn?.classList.add('loading');
+  try {
+    const d = await _dlPost('send', { mktId, orderId, kind, text });
+    if (d.ok) {
+      showCmdResult('Bildirim gönderildi ✅');
+      if (r) r[kind] = { ...(r[kind] || {}), status: 'sent', sentAt: Date.now(), sentText: d.sentText || text, sentTr: text };
+      refreshMsgBadge(); renderDelayPanel();
+    } else showCmdResult(d.error || 'Gönderim hatası', false);
+  } catch (e) { showCmdResult(`Bağlantı hatası: ${e.message}`, false); }
+  btn?.classList.remove('loading');
+}
+async function ignoreDelayMsg(mktId, orderId, kind, btn) {
+  if (!confirm(`${orderId} için bu bildirim gönderilmeyecek ve bir daha önerilmeyecek. Emin misin?`)) return;
+  btn?.classList.add('loading');
+  try {
+    const d = await _dlPost('ignore', { mktId, orderId, kind });
+    if (d.ok) { const r = _delayRecs[mktId]?.[orderId]; if (r?.[kind]) r[kind].status = 'ignored'; refreshMsgBadge(); renderDelayPanel(); }
+    else showCmdResult(d.error || 'Hata', false);
+  } catch (e) { showCmdResult(`Bağlantı hatası: ${e.message}`, false); }
+  btn?.classList.remove('loading');
+}
+async function scanDelayMsgs(btn) {
+  btn?.classList.add('loading');
+  try {
+    const d = await _dlPost('scan', {});
+    if (d.ok) showCmdResult(`Tarandı: ${d.newDelay || 0} yeni gecikme, ${d.newDelivered || 0} teslim taslağı`);
+    else showCmdResult(d.error || 'Tarama hatası', false);
+    await loadMsgQueues(); renderMsgPanel();
+  } catch (e) { showCmdResult(`Bağlantı hatası: ${e.message}`, false); }
+  btn?.classList.remove('loading');
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
