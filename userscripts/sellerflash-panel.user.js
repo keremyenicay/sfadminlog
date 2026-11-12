@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SellerFlash Panel (Sunucu Modu)
 // @namespace    http://tampermonkey.net/
-// @version      2.0.4
+// @version      2.0.5
 // @description  Hafif panel — tüm otomasyon sunucuda çalışır. Bu eklenti sadece UI gösterir. SF token manuel olarak Supabase'e girilmeli.
 // @author       Kerem Yeniçay & AI
 // @downloadURL  https://raw.githubusercontent.com/keremyenicay/sfadminlog/main/userscripts/sellerflash-panel.user.js
@@ -362,6 +362,13 @@
         },
         isComing:    o => !OrderState.isDepot(o) && !OrderState.isShipped(o) && !OrderState.isDelivered(o)
                           && !!o.status && /shipped|arriving|out for delivery/i.test(o.status),
+        // Kargo durumu kaç gündür aynı (teslim edilmemiş, takip no'lu gönderiler)
+        staleDays:       o => {
+            if (!o.whTracking || !o.whTrackStatusAt || OrderState.isDelivered(o)) return null;
+            if (/no tracking/i.test(o.whTracking)) return null;
+            return Math.floor((Date.now() - o.whTrackStatusAt) / 86400000);
+        },
+        isStale:         o => (OrderState.staleDays(o) ?? -1) >= 3,
         isOtherAcc:      o => !!(o.status?.includes('Diğer Hesapta') || o.status?.includes('Hesapta 🔄')),
         isSellerRefunded:o => o.isSellerRefunded === true,
         isBuyerRefunded: o => o.isBuyerRefunded  === true,
@@ -389,7 +396,7 @@
     // STATS GÜNCELLE
     // ─────────────────────────────────────────────
     function updateStats() {
-        const counts = { total:0, amz:0, coming:0, depot:0, shipped:0, delivered:0, alarm:0, sellerRef:0, buyerRef:0, other:0, nopv:0 };
+        const counts = { stale:0, total:0, amz:0, coming:0, depot:0, shipped:0, delivered:0, alarm:0, sellerRef:0, buyerRef:0, other:0, nopv:0 };
         for (const [id, o] of Object.entries(DB)) {
             if (HIDDEN_ORDERS.has(id)) continue;
             counts.total++;
@@ -403,6 +410,7 @@
             if (OrderState.isOtherAcc(o))       counts.other++;
             if (OrderState.isAmz(o))            counts.amz++;
             if (o.whError === 'NoPV')           counts.nopv++;
+            if (OrderState.isStale(o))          counts.stale++;
         }
         const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
         set('st-total', counts.total); set('st-amz', counts.amz);
@@ -411,6 +419,7 @@
         set('st-alarm', counts.alarm); set('st-seller-refunded', counts.sellerRef);
         set('st-buyer-refunded', counts.buyerRef); set('st-other', counts.other);
         set('st-nopv', counts.nopv);
+        set('st-stale', counts.stale);
     }
 
     // ─────────────────────────────────────────────
@@ -439,6 +448,7 @@
                 if (CURRENT_FILTER === 'SELLER_REFUNDED') return OrderState.isSellerRefunded(o);
                 if (CURRENT_FILTER === 'BUYER_REFUNDED')  return OrderState.isBuyerRefunded(o);
                 if (CURRENT_FILTER === 'NOPV')            return o.whError === 'NoPV';
+                if (CURRENT_FILTER === 'STALE')           return OrderState.isStale(o);
                 return true;
             });
         }
@@ -595,6 +605,16 @@
             }
         }
 
+        // Kargo kaç gündür aynı durumda
+        let staleHtml = '';
+        const sd = OrderState.staleDays(d);
+        if (sd !== null) {
+            const since = new Date(d.whTrackStatusAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+            const cls = sd >= 5 ? 'bd-r' : sd >= 3 ? 'bd-o' : 'bd-gy';
+            const txt = sd === 0 ? 'bugün güncellendi' : `${d.whTrackStatusAtApprox ? '≥' : ''}${sd} gündür aynı`;
+            staleHtml = ` <span class="bd ${cls}" style="margin-left:4px;" title="Kargo durumu ${since} tarihinden beri değişmedi${d.whTrackStatusAtApprox ? ' (en az — kayıt bu tarihte başladı)' : ''}">⏳ ${txt}</span>`;
+        }
+
         // Son güncelleme
         const lastUpdate = d.lastCheck
             ? new Date(d.lastCheck).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})
@@ -636,7 +656,7 @@
             trackHtml,
             cargoHtml,
             `<span style="font-size:11px;color:#475569;">${d.whStatus||'—'}</span>`,
-            `<span style="font-size:11px;">${d.whTrackStatus||'—'}</span>`,
+            `<span style="font-size:11px;">${d.whTrackStatus||'—'}</span>${staleHtml}`,
             `<span style="font-size:11px;color:#64748b;">${d.exitDate||'—'}</span>`,
             daysHtml,
             `<span style="font-size:11px;color:#94a3b8;">${lastUpdate}</span>`,
@@ -655,12 +675,12 @@
     // EXCEL EXPORT
     // ─────────────────────────────────────────────
     function exportToExcel() {
-        const headers = ['SF Sipariş No','ASIN','Buyer Sipariş No','Amazon Durum','Amazon Takip','Amazon Kargo','Amazon Teslim','Depo','Depo No','Shipment ID','Takip No','Kargo','Depo Durumu','Teslimat Durumu','Çıkış Tarihi'];
+        const headers = ['SF Sipariş No','ASIN','Buyer Sipariş No','Amazon Durum','Amazon Takip','Amazon Kargo','Amazon Teslim','Depo','Depo No','Shipment ID','Takip No','Kargo','Depo Durumu','Teslimat Durumu','Kargo Aynı Durumda (gün)','Çıkış Tarihi'];
         const rows = VS.data.map(([id, d]) => [
             id, d.asin||'', d.buyerOrderId||'', d.status||'', d.amazonTrackingId||'', d.amazonCarrier||'',
             (d.amazonDeliveredAt ? new Date(d.amazonDeliveredAt).toLocaleString('tr-TR') : ''), d.warehouse||'', d.warehouseId||'',
             d.shipmentId||'', d.whTracking||'', d.cargoCompany||'',
-            d.whStatus||'', d.whTrackStatus||'', d.exitDate||''
+            d.whStatus||'', d.whTrackStatus||'', (OrderState.staleDays(d) ?? ''), d.exitDate||''
         ]);
         const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
         const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -803,6 +823,7 @@
             <div class="sf-st" id="box-alarm">             <span id="st-alarm"          class="sf-stv r">0</span><span class="sf-stl">🚨 Alarm</span></div>
             <div class="sf-st" id="box-seller-refunded">   <span id="st-seller-refunded" class="sf-stv r">0</span><span class="sf-stl">💸 Müşt.İade</span></div>
             <div class="sf-st" id="box-buyer-refunded">    <span id="st-buyer-refunded"  class="sf-stv o">0</span><span class="sf-stl">💰 AMZ İade</span></div>
+            <div class="sf-st" id="box-stale" title="Kargo durumu 3+ gündür değişmeyen gönderiler">  <span id="st-stale" class="sf-stv o">0</span><span class="sf-stl">⏳ Kargo Bekliyor</span></div>
             <div class="sf-st" id="box-nopv">              <span id="st-nopv"           class="sf-stv r">0</span><span class="sf-stl">Token Eksik</span></div>
         </div>
 
@@ -921,7 +942,7 @@
             'box-coming': 'COMING', 'box-depot': 'DEPOT', 'box-shipped': 'SHIPPED',
             'box-delivered': 'DELIVERED', 'box-alarm': 'ALARM',
             'box-seller-refunded': 'SELLER_REFUNDED', 'box-buyer-refunded': 'BUYER_REFUNDED',
-            'box-nopv': 'NOPV'
+            'box-nopv': 'NOPV', 'box-stale': 'STALE'
         };
         document.querySelectorAll('.sf-st').forEach(box => {
             box.onclick = () => {
