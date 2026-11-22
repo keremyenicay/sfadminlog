@@ -796,6 +796,21 @@ td { padding: 16px 24px; vertical-align: middle; }
   flex-shrink: 0; -webkit-appearance: none; transition: all .2s; margin-top: 2px;
 }
 #modal-close:hover { background: var(--bg4); color: var(--text); }
+/* Önceki / sonraki sipariş okları */
+.modal-nav { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-top: 2px; }
+.modal-nav button { width: 36px; height: 36px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  color: var(--text2); cursor: pointer; font-size: 18px; font-weight: 700; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+.modal-nav button:hover:not(:disabled) { background: var(--bg4); color: var(--text); }
+.modal-nav button:disabled { opacity: .35; cursor: default; }
+.modal-nav .modal-pos { font-family: var(--mono); font-size: 11px; color: var(--text3); min-width: 44px; text-align: center; }
+/* Müşteri iptal talebi */
+tr.row-cancelreq { background: rgba(225,29,72,0.06); }
+tr.row-cancelreq td { background: transparent !important; }
+tr.row-cancelreq td:first-child { box-shadow: inset 4px 0 0 var(--red); }
+.cancelreq-badge { display: inline-block; padding: 3px 8px; background: rgba(225,29,72,0.12); color: var(--red); border: 1px solid rgba(225,29,72,0.35);
+  border-radius: 6px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.cancelreq-banner { margin: 0 0 18px; padding: 14px 16px; border-radius: 14px; background: rgba(225,29,72,0.08); border: 1px solid rgba(225,29,72,0.35); color: var(--red); }
+.cancelreq-banner b { font-size: 15px; } .cancelreq-banner div { font-size: 13px; margin-top: 4px; color: var(--text2); }
 #modal-close:active { transform: scale(0.9); }
 
 #modal-content { padding: 20px 24px 24px; padding-bottom: calc(24px + var(--safe-bot)); }
@@ -1453,6 +1468,7 @@ td { padding: 16px 24px; vertical-align: middle; }
       <button class="ftab" onclick="setFilter('amazon',this)">Amazon</button>
       <button class="ftab" onclick="setFilter('done',this)">Tamam</button>
       <button class="ftab" onclick="setFilter('skipped',this)">Atlandı</button>
+      <button class="ftab" id="ftab-cancelreq" onclick="setFilter('cancelreq',this)" style="display:none;color:var(--red)">🚫 İptal talebi <span id="cancelreq-count"></span></button>
     </div>
     <div id="loading"><div class="spinner"></div>Veriler Yükleniyor...</div>
     <div id="orders-table-wrap">
@@ -1488,6 +1504,11 @@ td { padding: 16px 24px; vertical-align: middle; }
       <div class="modal-head-info">
         <div id="modal-title">—</div>
         <div class="modal-sid" id="modal-sid"></div>
+      </div>
+      <div class="modal-nav">
+        <button id="modal-prev" onclick="navModal(-1)" title="Önceki sipariş (←)">‹</button>
+        <span class="modal-pos" id="modal-pos"></span>
+        <button id="modal-next" onclick="navModal(1)" title="Sonraki sipariş (→)">›</button>
       </div>
       <button id="modal-close" onclick="closeModal()">✕</button>
     </div>
@@ -1723,6 +1744,9 @@ async function fetchAllData(dirty = null) {
       const raw = await sbGetC(`ORDER_BOT_PENDING_${mktId}`, dirty);
       if (!raw) continue;
       const pending = (typeof raw === 'object') ? raw : JSON.parse(raw);
+      // Müşteri iptal talepleri (sunucu SP-API ile tespit edip yazar)
+      let cancelReqs = {};
+      try { const cr = await sbGetC(`CANCEL_REQ_${mktId}`, dirty); if (cr) cancelReqs = (typeof cr === 'object') ? cr : JSON.parse(cr); } catch (e) {}
 
       // DB_<mkt> zaten yukarıda cache'lendi — yeniden indirme yok
       const dbData = dbCache[mktId] || {};
@@ -1765,7 +1789,8 @@ async function fetchAllData(dirty = null) {
           sid,
           mktId,
           storeName: storeNames[mktId] || mktId,
-          prices
+          prices,
+          cancelReq: cancelReqs[sid] || null
         });
       }
 
@@ -2063,10 +2088,16 @@ function renderOrders() {
 
   let orders = _activeFilter === 'all'
     ? _allOrders
+    : _activeFilter === 'cancelreq' ? _allOrders.filter(o => o.cancelReq)
     : _allOrders.filter(o => getOrderState(o) === _activeFilter);
 
   if (_activeMkt) orders = orders.filter(o => o.mktId === _activeMkt);
-  orders.sort((a,b) => (b.detectedAt||0) - (a.detectedAt||0));
+  // Müşterinin iptal istediği (henüz satın alınmamış) siparişler en üstte
+  orders.sort((a,b) => (!!b.cancelReq - !!a.cancelReq) || ((b.detectedAt||0) - (a.detectedAt||0)));
+  _visibleOrders = orders.map(o => o.mktId + '|' + o.sid);
+  const _crCount = _allOrders.filter(o => o.cancelReq && (!_activeMkt || o.mktId === _activeMkt)).length;
+  const _crTab = document.getElementById('ftab-cancelreq');
+  if (_crTab) { _crTab.style.display = (_crCount || _activeFilter === 'cancelreq') ? '' : 'none'; document.getElementById('cancelreq-count').textContent = _crCount ? `(${_crCount})` : ''; }
 
   document.getElementById('empty-state').style.display = orders.length ? 'none' : 'block';
   document.getElementById('orders-table-wrap').style.display = orders.length ? '' : 'none';
@@ -2076,6 +2107,8 @@ function renderOrders() {
   for (const order of orders) {
     const state = getOrderState(order);
     const tr = document.createElement('tr');
+    if (order.cancelReq) tr.classList.add('row-cancelreq');
+    const crBadge = order.cancelReq ? `<span class="cancelreq-badge" title="${escHtml(order.cancelReq.reason || '')}">🚫 Müşteri iptal istedi</span>` : '';
 
     const isPending = _pendingOps.has(order.sid);
 
@@ -2087,7 +2120,7 @@ function renderOrders() {
         if (pVal !== null && (bestPrice === null || pVal < bestPrice)) { bestPrice = pVal; bestWh = wh; }
       }
     }
-    const priceHtml = (order.prices && bestPrice !== null)
+    const priceHtml = order.cancelReq ? `<span class="price-na">—</span>` : (order.prices && bestPrice !== null)
       ? `<span class="price-best">$${parseFloat(bestPrice).toFixed(2)}</span><span style="color:var(--text3);font-size:11px;margin-left:5px;font-family:var(--mono)">${bestWh||''}</span>`
       : `<span class="price-na">—</span>`;
 
@@ -2109,7 +2142,7 @@ function renderOrders() {
               <span class="sid-cell">${order.sid||'—'}</span>
               <span class="state-badge ${stateCls(state)}">${isPending ? '⏳' : stateLabel(state)}</span>
             </div>
-            <div class="product-cell">${order.productTitle||'—'}<br>${shipBadge}</div>
+            <div class="product-cell">${crBadge ? crBadge + '<br>' : ''}${order.productTitle||'—'}<br>${shipBadge}</div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
               <span class="asin-cell" style="display:inline-block">${order.asin||'—'}</span>
               <span class="price-cell">${priceHtml}</span>
@@ -2124,7 +2157,7 @@ function renderOrders() {
       if (isPending) tr.style.opacity = '0.55';
       tr.innerHTML = `
         <td class="sid-cell">${order.sid||'—'}</td>
-        <td class="product-cell" title="${order.productTitle||''}">${order.productTitle||'—'}<br>${shipBadge}</td>
+        <td class="product-cell" title="${order.productTitle||''}">${crBadge ? crBadge + '<br>' : ''}${order.productTitle||'—'}<br>${shipBadge}</td>
         <td class="asin-cell">${order.asin||'—'}</td>
         <td><span class="state-badge ${stateCls(state)}">${isPending ? '⏳ İşleniyor' : stateLabel(state)}</span></td>
         <td class="price-cell">${priceHtml}</td>
@@ -2141,6 +2174,7 @@ function buildActions(order, state) {
   const sid = order.sid, mktId = order.mktId;
   const isPending = _pendingOps.has(sid);
   if (isPending) return `<span style="color:var(--sf-orange);font-size:12px;font-weight:700;font-family:var(--mono)">⏳ İşleniyor...</span>`;
+  if (order.cancelReq && !['amazon', 'done'].includes(state)) return `<span class="cancelreq-badge">🚫 Satın almayın — SF'den iptal edin</span>`;
 
   // Bu sipariş queue'da mı?
   const queueIdx = _amazonQueue ? _amazonQueue.findIndex(j => j.sid === sid) : -1;
@@ -2209,11 +2243,14 @@ function openModal(order) {
   
   document.getElementById('modal-title').textContent = order.productTitle || order.sid || 'Sipariş Detayı';
   document.getElementById('modal-sid').textContent = order.sid || '';
+  _modalKey = order.mktId + '|' + order.sid;
+  updateModalNav();
+  const cancelReq = order.cancelReq && !['amazon', 'done'].includes(state) ? order.cancelReq : null;
 
   const depoLabels = { SF:'Shippinglot', PREPLARGE:'Preplarge (+$1.60)', COMFYSHIP:'Comfyship', FULLFILLONUS:'Fullfillonus (+$0.80)' };
 
   let pricesHtml = '';
-  if (order.prices) {
+  if (order.prices && !cancelReq) {
     let bestP = Infinity;
     for (const [wh, v] of Object.entries(order.prices)) {
       if (wh.startsWith('_')) continue;
@@ -2250,7 +2287,11 @@ function openModal(order) {
   const sfBodyInner  = (_sfCache && _sfCache.length) ? renderSfRows(order.sid, order.mktId, _sfCache) : _placeholder('Yüklemek için başlığa tıkla.');
   const sfBodyLoaded = (_sfCache && _sfCache.length) ? ' data-loaded="1"' : '';
 
+  const cancelBanner = cancelReq ? `<div class="cancelreq-banner"><b>🚫 Müşteri bu siparişin iptalini istedi</b>
+      <div>Mağaza: <b>${escHtml(order.storeName || order.mktId)}</b> · Amazon talebi: ${new Date(cancelReq.at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${cancelReq.reason ? ` · Neden: <b>${escHtml(cancelReq.reason)}</b>` : ''}</div>
+      <div>Depoya sipariş vermeyin, .com'dan satın almayın. Siparişi SellerFlash / Seller Central'dan iptal edin; ardından panelden silebilirsiniz.</div></div>` : '';
   document.getElementById('modal-content').innerHTML = `
+    ${cancelBanner}
     <div class="detail-grid">
       <div class="detail-item">
         <div class="detail-key">Seller ID</div>
@@ -2318,7 +2359,7 @@ function openModal(order) {
       </div>` : ''}
     </div>
     ${pricesHtml}
-    <div class="sf-carriers" id="sf-carriers-box">
+    ${cancelReq ? '' : `<div class="sf-carriers" id="sf-carriers-box">
       <div class="sf-carriers-head" onclick="toggleSfCarriers('${order.sid}','${order.mktId}')">
         <span class="sf-carriers-title">🚚 SF Kargo Seçenekleri</span>
         <span style="display:flex;align-items:center;gap:8px">
@@ -2327,8 +2368,8 @@ function openModal(order) {
         </span>
       </div>
       <div class="sf-carriers-body" id="sf-carriers-body" style="display:none"${sfBodyLoaded}>${sfBodyInner}</div>
-    </div>
-    ${state==='priced' ? ['PREPLARGE','COMFYSHIP','FULLFILLONUS'].map(wh => {
+    </div>`}
+    ${state==='priced' && !cancelReq ? ['PREPLARGE','COMFYSHIP','FULLFILLONUS'].map(wh => {
       const _c = order.prices?.[wh]?.carriers;
       const _inner  = (_c && _c.length) ? renderWhRows(order.sid, order.mktId, wh, _c) : _placeholder('Yüklemek için başlığa tıkla (~2-4 sn).');
       const _loaded = (_c && _c.length) ? ' data-loaded="1"' : '';
@@ -2344,7 +2385,8 @@ function openModal(order) {
       <div class="sf-carriers-body" id="wh-carriers-body-${wh}" style="display:none"${_loaded}>${_inner}</div>
     </div>`;}).join('') : ''}
     <div class="modal-actions">
-      ${isPending ? `<div style="width:100%;text-align:center;padding:16px;color:var(--sf-orange);font-weight:700;font-family:var(--mono);background:rgba(255,123,0,0.1);border-radius:12px;">⏳ İşlem Devam Ediyor... Lütfen Bekleyin.</div>` : `
+      ${isPending ? `<div style="width:100%;text-align:center;padding:16px;color:var(--sf-orange);font-weight:700;font-family:var(--mono);background:rgba(255,123,0,0.1);border-radius:12px;">⏳ İşlem Devam Ediyor... Lütfen Bekleyin.</div>` : cancelReq ? `
+        <button class="act-btn btn-skip" onclick="doDelete('${order.sid}','${order.mktId}')" style="background:rgba(225,29,72,0.1);color:var(--red);border-color:rgba(225,29,72,0.25)">🗑️ Panelden Sil</button>` : `
         ${state==='new' ? `<button class="act-btn btn-price" onclick="doPrice(event,'${order.sid}','${order.mktId}')">💰 Fiyat Al</button>` : ''}
         ${state==='priced' ? `
           <button class="act-btn btn-order" onclick="doOrder(event,'${order.sid}','${order.mktId}','PREPLARGE')">📦 PREPLARGE</button>
@@ -2384,7 +2426,35 @@ function openModal(order) {
 
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');
+  _modalKey = null;
 }
+// ─── Pencerede önceki / sonraki sipariş (listede görünen sırayla) ─────────────
+let _visibleOrders = [];
+let _modalKey = null;
+function updateModalNav() {
+  const i = _visibleOrders.indexOf(_modalKey), n = _visibleOrders.length;
+  const prev = document.getElementById('modal-prev'), next = document.getElementById('modal-next'), pos = document.getElementById('modal-pos');
+  if (!prev) return;
+  prev.disabled = i <= 0; next.disabled = i < 0 || i >= n - 1;
+  pos.textContent = i >= 0 ? `${i + 1} / ${n}` : '';
+}
+function navModal(d) {
+  const i = _visibleOrders.indexOf(_modalKey);
+  if (i < 0) return;
+  const key = _visibleOrders[i + d];
+  if (!key) return;
+  const order = _allOrders.find(o => o.mktId + '|' + o.sid === key);
+  if (!order) return;
+  openModal(order);
+  document.getElementById('modal').scrollTop = 0;
+}
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('modal-overlay').classList.contains('open')) return;
+  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
+  if (e.key === 'ArrowLeft') { e.preventDefault(); navModal(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); navModal(1); }
+  else if (e.key === 'Escape') closeModal();
+});
 document.getElementById('modal-overlay').onclick = e => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
 };
@@ -5111,7 +5181,7 @@ let _rtDebounce = null;
 let _rtLive = false;
 const _rtPendingKeys = new Set();
 // Ana panelin kullandığı anahtarlar; diğerleri (MSG_, LAST_, SF_TOKEN_, ORDER_BOT_PRICE vb.) yok sayılır
-const MAIN_KEY_RE = /^(DB_\d+|ORDER_BOT_PENDING_\d+|ORDER_BOT_PRICE_.+|AMAZON_AUTO_ORDER(_QUEUE)?|ACCOUNTS)$/;
+const MAIN_KEY_RE = /^(DB_\d+|ORDER_BOT_PENDING_\d+|ORDER_BOT_PRICE_.+|AMAZON_AUTO_ORDER(_QUEUE)?|ACCOUNTS|CANCEL_REQ_\d+)$/;
 function flushRealtimeKeys() {
   const keys = [..._rtPendingKeys]; _rtPendingKeys.clear();
   const main = new Set(keys.filter(k => MAIN_KEY_RE.test(k)));
