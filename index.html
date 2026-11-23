@@ -4376,6 +4376,7 @@ async function runSearch() {
   const statusBadge = o => {
     if (o.sfDelivered)    return '<span class="search-card-status" style="color:var(--green);">✅ Teslim</span>';
     if (o.isCancelledSF)  return '<span class="search-card-status" style="color:var(--red);">🚫 İptal</span>';
+    if (o.badBuyerId)     return '<span class="search-card-status" style="color:var(--red);" title="Business ve Prime .com hesaplarında bulunamadı — SF\'de düzelt">⚠️ Buyer ID hatalı</span>';
     return `<span class="search-card-status" style="color:var(--text2);">${o.status || '—'}</span>`;
   };
 
@@ -4405,7 +4406,7 @@ async function runSearch() {
         </div>
         <div class="search-card-field">
           <span class="search-card-label">Buyer Order ID</span>
-          <span class="search-card-val">${o.buyerOrderId || '—'}</span>
+          <span class="search-card-val">${o.buyerOrderId || '—'}${o.buyerAccount ? ` <span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:6px;background:${o.buyerAccount === 'prime' ? 'rgba(124,58,237,.15);color:#7c3aed' : 'rgba(100,116,139,.15);color:var(--text2)'}">${o.buyerAccount === 'prime' ? 'PRIME' : 'BIZ'}</span>` : ''}</span>
         </div>
         <div class="search-card-field">
           <span class="search-card-label">ASIN</span>
