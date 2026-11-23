@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SellerFlash Panel (Sunucu Modu)
 // @namespace    http://tampermonkey.net/
-// @version      2.0.6
+// @version      2.0.7
 // @description  Hafif panel — tüm otomasyon sunucuda çalışır. Bu eklenti sadece UI gösterir. SF token manuel olarak Supabase'e girilmeli.
 // @author       Kerem Yeniçay & AI
 // @downloadURL  https://raw.githubusercontent.com/keremyenicay/sfadminlog/main/userscripts/sellerflash-panel.user.js
@@ -375,7 +375,7 @@
             if (sd === null) return '';
             return sd === 0 ? 'bugün güncellendi' : `${o.whTrackStatusAtApprox ? '≥' : ''}${sd} gündür aynı`;
         },
-        isOtherAcc:      o => !!(o.status?.includes('Diğer Hesapta') || o.status?.includes('Hesapta 🔄')),
+        isOtherAcc:      o => !!(o.badBuyerId || o.status?.includes('Buyer ID Hatalı') || o.status?.includes('Diğer Hesapta') || o.status?.includes('Hesapta 🔄')),
         isSellerRefunded:o => o.isSellerRefunded === true,
         isBuyerRefunded: o => o.isBuyerRefunded  === true,
         isAlarm:         o => !o.isDeadOrder && !o.isSellerRefunded && !o.isBuyerRefunded
@@ -562,7 +562,8 @@
 
         // Amazon durum badge
         let amzHtml = `<span class="bd bd-gy">${d.status||'?'}</span>`;
-        if (d.idNotFound && !d.isCancelledSF)            amzHtml = `<span class="bd bd-o">⏳ ID Yok</span>`;
+        if (d.badBuyerId && !d.isCancelledSF)            amzHtml = `<span class="bd bd-r" title="Bu buyer order ID Business ve Prime .com hesaplarının hiçbirinde bulunamadı. SF'deki ID'yi düzelt.">⚠️ Buyer ID hatalı</span>`;
+        else if (d.idNotFound && !d.isCancelledSF)       amzHtml = `<span class="bd bd-o">⏳ ID Yok</span>`;
         else if (d.isCancelledSF || d.status?.includes('Cancel')) amzHtml = `<span class="bd bd-r">🚫 İptal</span>`;
         else if (d.deliveryOverdue)                       amzHtml = `<span class="bd bd-r">⏰ Gecikti</span>`;
         else if (d.isSellerRefunded)                      amzHtml = `<span class="bd bd-r">💸 Müşt.İade</span>`;
@@ -642,7 +643,9 @@
 
         const sfOrderHtml = `<a href="https://panel.sellerflash.com/sellerOrder/${id}" target="_blank" style="font-family:monospace;font-size:11px;color:#1d4ed8;text-decoration:none;" title="SellerFlash'te aç">${id}</a>`;
         const buyerOrderHtml = (d.buyerOrderId && d.buyerOrderId !== '—')
-            ? `<a href="https://www.amazon.com/your-orders/order-details?orderID=${d.buyerOrderId}&ref=ab_ppx_yo_dt_b_fed_order_details" target="_blank" style="font-family:monospace;font-size:11px;color:#c2410c;text-decoration:none;" title="Amazon'da aç">${d.buyerOrderId}</a>`
+            ? `<a href="https://www.amazon.com/your-orders/order-details?orderID=${d.buyerOrderId}&ref=ab_ppx_yo_dt_b_fed_order_details" target="_blank" style="font-family:monospace;font-size:11px;color:${d.badBuyerId ? '#dc2626' : '#c2410c'};text-decoration:none;" title="Amazon'da aç${d.buyerAccount ? ' — ' + (d.buyerAccount === 'prime' ? 'Prime' : 'Business Prime') + ' hesabında' : ''}">${d.buyerOrderId}</a>`
+              + (d.buyerAccount ? ` <span class="bd ${d.buyerAccount === 'prime' ? 'bd-p' : 'bd-gy'}" style="font-size:9px;padding:1px 4px;" title="Sipariş bu .com alıcı hesabında bulundu">${d.buyerAccount === 'prime' ? 'PRIME' : 'BIZ'}</span>` : '')
+              + (d.prevBuyerOrderIds?.length ? ` <span title="Önceki buyer ID: ${d.prevBuyerOrderIds.join(', ')}" style="cursor:help;font-size:10px;">🔁</span>` : '')
             : '<span style="color:#94a3b8;">—</span>';
 
         const asinHtml = d.asin
@@ -835,7 +838,7 @@
         <div id="sf-stats">
             <div class="sf-st active" id="box-all">        <span id="st-total"          class="sf-stv">0</span><span class="sf-stl">Toplam</span></div>
             <div class="sf-st" id="box-amz">               <span id="st-amz"            class="sf-stv">0</span><span class="sf-stl">AMZ Bekl.</span></div>
-            <div class="sf-st" id="box-other">             <span id="st-other"          class="sf-stv p">0</span><span class="sf-stl">Diğer Acc</span></div>
+            <div class="sf-st" id="box-other">             <span id="st-other"          class="sf-stv p">0</span><span class="sf-stl" title="Buyer order ID hiçbir .com alıcı hesabında (Business / Prime) bulunamadı — SF'de düzeltilmeli">Hatalı ID</span></div>
             <div class="sf-st" id="box-coming">            <span id="st-coming"         class="sf-stv o">0</span><span class="sf-stl">Yolda</span></div>
             <div class="sf-st" id="box-depot">             <span id="st-depot"          class="sf-stv b">0</span><span class="sf-stl">Depoda</span></div>
             <div class="sf-st" id="box-shipped">           <span id="st-shipped"        class="sf-stv g">0</span><span class="sf-stl">Kargoda</span></div>
